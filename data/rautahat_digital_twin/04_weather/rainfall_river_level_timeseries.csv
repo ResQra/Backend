@@ -1,0 +1,7 @@
+date,station,district,rainfall_24h_mm,rainfall_7d_mm,bagmati_level_m,lalbakaiya_level_m,discharge_cfs,flood_status
+2024-08-01,Gaur Hydro-Met Station,Rautahat,42.5,110.0,3.20,2.60,45000,NORMAL
+2024-08-05,Gaur Hydro-Met Station,Rautahat,88.0,195.0,4.10,3.40,78000,ELEVATED
+2024-08-10,Gaur Hydro-Met Station,Rautahat,165.0,380.0,5.40,4.60,135000,WARNING
+2024-08-14,Gaur Hydro-Met Station,Rautahat,240.0,620.0,6.80,5.40,210000,DEFCON_1_CATASTROPHIC
+2024-08-15,Gaur Hydro-Met Station,Rautahat,190.0,710.0,6.65,5.10,195000,DEFCON_1_CATASTROPHIC
+2024-08-18,Gaur Hydro-Met Station,Rautahat,55.0,450.0,4.80,3.90,98000,RECEDING

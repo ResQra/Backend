@@ -1,0 +1,57 @@
+{
+  "type": "FeatureCollection",
+  "name": "Rautahat_Vulnerable_Embankment_Breach_Points",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "breach_gaur_ring_road",
+        "name": "Gaur Ring Road Sluice Breach Point",
+        "river": "Bagmati",
+        "vulnerability": "HIGH_POPULATION_EXPOSURE",
+        "elevation_m": 64.5
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          85.278,
+          26.76
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "breach_tikuliya_ghat",
+        "name": "Tikuliya Ghat Embankment Breach",
+        "river": "Lalbakaiya",
+        "vulnerability": "HIGH_TORRENT_CURRENT",
+        "elevation_m": 67.2
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          85.242,
+          26.782
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "breach_badaharwa",
+        "name": "Badaharwa Bagmati Bundh Weakness",
+        "river": "Bagmati",
+        "vulnerability": "AGRICULTURAL_EROSION",
+        "elevation_m": 65.8
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          85.315,
+          26.775
+        ]
+      }
+    }
+  ]
+}

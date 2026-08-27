@@ -1,0 +1,105 @@
+{
+  "type": "FeatureCollection",
+  "name": "Rautahat_Critical_Infrastructure",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Gaur District Hospital & Trauma Center",
+        "type": "HOSPITAL",
+        "beds": 160,
+        "elevation_m": 65.2,
+        "boat_dock": true
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          85.278,
+          26.764
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rautahat Multi-Purpose Sports Stadium Evacuation Camp",
+        "type": "SHELTER",
+        "capacity": 3000,
+        "elevation_m": 68.0,
+        "generator": true
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          85.281,
+          26.768
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Juddha Secondary School Relief Camp",
+        "type": "SHELTER",
+        "capacity": 1800,
+        "elevation_m": 66.5
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          85.272,
+          26.759
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Chandranigahapur Highway Hospital Hub",
+        "type": "HOSPITAL",
+        "beds": 300,
+        "elevation_m": 126.0,
+        "heli_pad": true
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          85.342,
+          27.126
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Garuda Municipal Complex Hub",
+        "type": "SHELTER",
+        "capacity": 2200,
+        "elevation_m": 78.5
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          85.311,
+          26.924
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Tikuliya Ghat High Ground Post",
+        "type": "SHELTER",
+        "capacity": 950,
+        "elevation_m": 68.4
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          85.244,
+          26.786
+        ]
+      }
+    }
+  ]
+}

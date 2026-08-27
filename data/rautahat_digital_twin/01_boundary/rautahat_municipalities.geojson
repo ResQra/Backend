@@ -1,0 +1,690 @@
+{
+  "type": "FeatureCollection",
+  "name": "Rautahat_Municipalities",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "ADM3_EN": "Gaur",
+        "ADM3_PCODE": "NP0200401",
+        "TYPE": "Municipality",
+        "AVG_ELEVATION_M": 65,
+        "HISTORICAL_FLOOD_RISK": "CRITICAL",
+        "PRIMARY_RIVER_BASIN": "Lalbakaiya"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              85.25099999999999,
+              26.737000000000002
+            ],
+            [
+              85.301,
+              26.737000000000002
+            ],
+            [
+              85.301,
+              26.787
+            ],
+            [
+              85.25099999999999,
+              26.787
+            ],
+            [
+              85.25099999999999,
+              26.737000000000002
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADM3_EN": "Chandrapur",
+        "ADM3_PCODE": "NP0200402",
+        "TYPE": "Municipality",
+        "AVG_ELEVATION_M": 125,
+        "HISTORICAL_FLOOD_RISK": "LOW",
+        "PRIMARY_RIVER_BASIN": "Bagmati"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              85.315,
+              27.1
+            ],
+            [
+              85.36500000000001,
+              27.1
+            ],
+            [
+              85.36500000000001,
+              27.15
+            ],
+            [
+              85.315,
+              27.15
+            ],
+            [
+              85.315,
+              27.1
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADM3_EN": "Garuda",
+        "ADM3_PCODE": "NP0200403",
+        "TYPE": "Municipality",
+        "AVG_ELEVATION_M": 78,
+        "HISTORICAL_FLOOD_RISK": "MEDIUM",
+        "PRIMARY_RIVER_BASIN": "Bagmati"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              85.28699999999999,
+              26.900000000000002
+            ],
+            [
+              85.337,
+              26.900000000000002
+            ],
+            [
+              85.337,
+              26.95
+            ],
+            [
+              85.28699999999999,
+              26.95
+            ],
+            [
+              85.28699999999999,
+              26.900000000000002
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADM3_EN": "Rajpur",
+        "ADM3_PCODE": "NP0200404",
+        "TYPE": "Municipality",
+        "AVG_ELEVATION_M": 72,
+        "HISTORICAL_FLOOD_RISK": "HIGH",
+        "PRIMARY_RIVER_BASIN": "Lalbakaiya"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              85.22,
+              26.795
+            ],
+            [
+              85.27000000000001,
+              26.795
+            ],
+            [
+              85.27000000000001,
+              26.845
+            ],
+            [
+              85.22,
+              26.845
+            ],
+            [
+              85.22,
+              26.795
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADM3_EN": "Katahariya",
+        "ADM3_PCODE": "NP0200405",
+        "TYPE": "Municipality",
+        "AVG_ELEVATION_M": 82,
+        "HISTORICAL_FLOOD_RISK": "MEDIUM",
+        "PRIMARY_RIVER_BASIN": "Lalbakaiya"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              85.19999999999999,
+              26.925
+            ],
+            [
+              85.25,
+              26.925
+            ],
+            [
+              85.25,
+              26.974999999999998
+            ],
+            [
+              85.19999999999999,
+              26.974999999999998
+            ],
+            [
+              85.19999999999999,
+              26.925
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADM3_EN": "Ishnath",
+        "ADM3_PCODE": "NP0200406",
+        "TYPE": "Municipality",
+        "AVG_ELEVATION_M": 68,
+        "HISTORICAL_FLOOD_RISK": "CRITICAL",
+        "PRIMARY_RIVER_BASIN": "Lalbakaiya"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              85.205,
+              26.715
+            ],
+            [
+              85.25500000000001,
+              26.715
+            ],
+            [
+              85.25500000000001,
+              26.764999999999997
+            ],
+            [
+              85.205,
+              26.764999999999997
+            ],
+            [
+              85.205,
+              26.715
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADM3_EN": "Brindaban",
+        "ADM3_PCODE": "NP0200407",
+        "TYPE": "Municipality",
+        "AVG_ELEVATION_M": 90,
+        "HISTORICAL_FLOOD_RISK": "LOW",
+        "PRIMARY_RIVER_BASIN": "Bagmati"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              85.32499999999999,
+              26.995
+            ],
+            [
+              85.375,
+              26.995
+            ],
+            [
+              85.375,
+              27.044999999999998
+            ],
+            [
+              85.32499999999999,
+              27.044999999999998
+            ],
+            [
+              85.32499999999999,
+              26.995
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADM3_EN": "Durga Bhagawati",
+        "ADM3_PCODE": "NP0200408",
+        "TYPE": "Rural Municipality",
+        "AVG_ELEVATION_M": 66,
+        "HISTORICAL_FLOOD_RISK": "CRITICAL",
+        "PRIMARY_RIVER_BASIN": "Bagmati"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              85.29499999999999,
+              26.755000000000003
+            ],
+            [
+              85.345,
+              26.755000000000003
+            ],
+            [
+              85.345,
+              26.805
+            ],
+            [
+              85.29499999999999,
+              26.805
+            ],
+            [
+              85.29499999999999,
+              26.755000000000003
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADM3_EN": "Yamunamai",
+        "ADM3_PCODE": "NP0200409",
+        "TYPE": "Rural Municipality",
+        "AVG_ELEVATION_M": 70,
+        "HISTORICAL_FLOOD_RISK": "HIGH",
+        "PRIMARY_RIVER_BASIN": "Bagmati"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              85.265,
+              26.785
+            ],
+            [
+              85.31500000000001,
+              26.785
+            ],
+            [
+              85.31500000000001,
+              26.834999999999997
+            ],
+            [
+              85.265,
+              26.834999999999997
+            ],
+            [
+              85.265,
+              26.785
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADM3_EN": "Gadhimai",
+        "ADM3_PCODE": "NP0200410",
+        "TYPE": "Municipality",
+        "AVG_ELEVATION_M": 80,
+        "HISTORICAL_FLOOD_RISK": "MEDIUM",
+        "PRIMARY_RIVER_BASIN": "Bagmati"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              85.30499999999999,
+              26.935000000000002
+            ],
+            [
+              85.355,
+              26.935000000000002
+            ],
+            [
+              85.355,
+              26.985
+            ],
+            [
+              85.30499999999999,
+              26.985
+            ],
+            [
+              85.30499999999999,
+              26.935000000000002
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADM3_EN": "Madhav Narayan",
+        "ADM3_PCODE": "NP0200411",
+        "TYPE": "Municipality",
+        "AVG_ELEVATION_M": 74,
+        "HISTORICAL_FLOOD_RISK": "HIGH",
+        "PRIMARY_RIVER_BASIN": "Bagmati"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              85.285,
+              26.845000000000002
+            ],
+            [
+              85.33500000000001,
+              26.845000000000002
+            ],
+            [
+              85.33500000000001,
+              26.895
+            ],
+            [
+              85.285,
+              26.895
+            ],
+            [
+              85.285,
+              26.845000000000002
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADM3_EN": "Phatuwa Bijaypur",
+        "ADM3_PCODE": "NP0200412",
+        "TYPE": "Municipality",
+        "AVG_ELEVATION_M": 95,
+        "HISTORICAL_FLOOD_RISK": "LOW",
+        "PRIMARY_RIVER_BASIN": "Lalbakaiya"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              85.18499999999999,
+              27.025000000000002
+            ],
+            [
+              85.235,
+              27.025000000000002
+            ],
+            [
+              85.235,
+              27.075
+            ],
+            [
+              85.18499999999999,
+              27.075
+            ],
+            [
+              85.18499999999999,
+              27.025000000000002
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADM3_EN": "Gujara",
+        "ADM3_PCODE": "NP0200413",
+        "TYPE": "Municipality",
+        "AVG_ELEVATION_M": 110,
+        "HISTORICAL_FLOOD_RISK": "LOW",
+        "PRIMARY_RIVER_BASIN": "Lalbakaiya"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              85.225,
+              27.075000000000003
+            ],
+            [
+              85.275,
+              27.075000000000003
+            ],
+            [
+              85.275,
+              27.125
+            ],
+            [
+              85.225,
+              27.125
+            ],
+            [
+              85.225,
+              27.075000000000003
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADM3_EN": "Maulapur",
+        "ADM3_PCODE": "NP0200414",
+        "TYPE": "Municipality",
+        "AVG_ELEVATION_M": 76,
+        "HISTORICAL_FLOOD_RISK": "MEDIUM",
+        "PRIMARY_RIVER_BASIN": "Lalbakaiya"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              85.19,
+              26.865000000000002
+            ],
+            [
+              85.24000000000001,
+              26.865000000000002
+            ],
+            [
+              85.24000000000001,
+              26.915
+            ],
+            [
+              85.19,
+              26.915
+            ],
+            [
+              85.19,
+              26.865000000000002
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADM3_EN": "Dewahi Gonahi",
+        "ADM3_PCODE": "NP0200415",
+        "TYPE": "Municipality",
+        "AVG_ELEVATION_M": 77,
+        "HISTORICAL_FLOOD_RISK": "MEDIUM",
+        "PRIMARY_RIVER_BASIN": "Lalbakaiya"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              85.225,
+              26.885
+            ],
+            [
+              85.275,
+              26.885
+            ],
+            [
+              85.275,
+              26.935
+            ],
+            [
+              85.225,
+              26.935
+            ],
+            [
+              85.225,
+              26.885
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADM3_EN": "Paroha",
+        "ADM3_PCODE": "NP0200416",
+        "TYPE": "Municipality",
+        "AVG_ELEVATION_M": 71,
+        "HISTORICAL_FLOOD_RISK": "HIGH",
+        "PRIMARY_RIVER_BASIN": "Lalbakaiya"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              85.235,
+              26.815
+            ],
+            [
+              85.28500000000001,
+              26.815
+            ],
+            [
+              85.28500000000001,
+              26.865
+            ],
+            [
+              85.235,
+              26.865
+            ],
+            [
+              85.235,
+              26.815
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADM3_EN": "Baudhimai",
+        "ADM3_PCODE": "NP0200417",
+        "TYPE": "Municipality",
+        "AVG_ELEVATION_M": 69,
+        "HISTORICAL_FLOOD_RISK": "HIGH",
+        "PRIMARY_RIVER_BASIN": "Lalbakaiya"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              85.195,
+              26.765
+            ],
+            [
+              85.245,
+              26.765
+            ],
+            [
+              85.245,
+              26.814999999999998
+            ],
+            [
+              85.195,
+              26.814999999999998
+            ],
+            [
+              85.195,
+              26.765
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADM3_EN": "Rajdevi",
+        "ADM3_PCODE": "NP0200418",
+        "TYPE": "Municipality",
+        "AVG_ELEVATION_M": 66,
+        "HISTORICAL_FLOOD_RISK": "CRITICAL",
+        "PRIMARY_RIVER_BASIN": "Bagmati"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              85.285,
+              26.715
+            ],
+            [
+              85.33500000000001,
+              26.715
+            ],
+            [
+              85.33500000000001,
+              26.764999999999997
+            ],
+            [
+              85.285,
+              26.764999999999997
+            ],
+            [
+              85.285,
+              26.715
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

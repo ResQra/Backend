@@ -1,0 +1,52 @@
+{
+  "type": "FeatureCollection",
+  "name": "Rautahat_2024_Monsoon_Flood_Extent_Sentinel1",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "year": 2024,
+        "month": "August",
+        "peak_river_level_m": 6.85,
+        "inundation_depth_avg_m": 1.8,
+        "affected_population": 142000,
+        "satellite_source": "ESA Sentinel-1 SAR Change Detection"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              85.23,
+              26.72
+            ],
+            [
+              85.29,
+              26.71
+            ],
+            [
+              85.34,
+              26.75
+            ],
+            [
+              85.33,
+              26.83
+            ],
+            [
+              85.28,
+              26.84
+            ],
+            [
+              85.22,
+              26.79
+            ],
+            [
+              85.23,
+              26.72
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

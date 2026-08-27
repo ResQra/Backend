@@ -1,0 +1,132 @@
+{
+  "type": "FeatureCollection",
+  "name": "Rautahat_River_Network",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Bagmati River (Eastern Boundary)",
+        "waterway": "river",
+        "danger_level_m": 4.5,
+        "danger_discharge_cfs": 150000,
+        "critical_embankments": [
+          "Gaur Ring Road",
+          "Belbichhwa Bundh",
+          "Badaharwa Ghat"
+        ]
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            85.36,
+            27.18
+          ],
+          [
+            85.35,
+            27.1
+          ],
+          [
+            85.34,
+            27.0
+          ],
+          [
+            85.33,
+            26.9
+          ],
+          [
+            85.32,
+            26.82
+          ],
+          [
+            85.3,
+            26.76
+          ],
+          [
+            85.28,
+            26.7
+          ],
+          [
+            85.26,
+            26.65
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Lalbakaiya River (Western Corridor)",
+        "waterway": "river",
+        "danger_level_m": 3.8,
+        "danger_discharge_cfs": 85000,
+        "critical_embankments": [
+          "Tikuliya Ghat",
+          "Baudhimai Bundh",
+          "Ishnath Bundh"
+        ]
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            85.23,
+            27.05
+          ],
+          [
+            85.22,
+            26.95
+          ],
+          [
+            85.225,
+            26.85
+          ],
+          [
+            85.24,
+            26.78
+          ],
+          [
+            85.25,
+            26.72
+          ],
+          [
+            85.26,
+            26.65
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Jhanjh River (Central Tributary)",
+        "waterway": "stream",
+        "danger_level_m": 2.8,
+        "critical_embankments": [
+          "Garuda Lowland Approach"
+        ]
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            85.29,
+            27.0
+          ],
+          [
+            85.3,
+            26.92
+          ],
+          [
+            85.295,
+            26.85
+          ],
+          [
+            85.29,
+            26.77
+          ]
+        ]
+      }
+    }
+  ]
+}

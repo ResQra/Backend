@@ -1,0 +1,75 @@
+{
+  "type": "FeatureCollection",
+  "name": "Rautahat_District_Boundary",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "ADM0_EN": "Nepal",
+        "ADM1_EN": "Madhesh Province",
+        "ADM2_EN": "Rautahat",
+        "ADM2_PCODE": "NP02004",
+        "AREA_SQKM": 1126.0,
+        "HEADQUARTER": "Gaur",
+        "FLOOD_DEFCON": 1
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              85.18,
+              26.7
+            ],
+            [
+              85.22,
+              26.65
+            ],
+            [
+              85.31,
+              26.66
+            ],
+            [
+              85.38,
+              26.74
+            ],
+            [
+              85.44,
+              26.9
+            ],
+            [
+              85.42,
+              27.08
+            ],
+            [
+              85.37,
+              27.18
+            ],
+            [
+              85.29,
+              27.16
+            ],
+            [
+              85.22,
+              27.02
+            ],
+            [
+              85.19,
+              26.85
+            ],
+            [
+              85.18,
+              26.7
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

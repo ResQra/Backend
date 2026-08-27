@@ -1,0 +1,121 @@
+{
+  "type": "FeatureCollection",
+  "name": "Rautahat_Rescue_Fleet_Stations",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "team_id": "team_gaur_bagmati",
+        "name": "GAUR BAGMATI WATER RESCUE UNIT (Rautahat)",
+        "lead_unit": true,
+        "vessel_type": "Heavy Inflatable Motorboat (Cap 16)",
+        "crew_size": 8,
+        "radio": "144.2 MHz",
+        "contact": "+977-55-520100",
+        "status": "AVAILABLE"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          85.275,
+          26.761
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "team_id": "team_apf_rautahat",
+        "name": "APF NO. 11 BATTALION RAUTAHAT",
+        "lead_unit": false,
+        "vessel_type": "Amphibious Troop Raft (Cap 22)",
+        "crew_size": 12,
+        "radio": "142.8 MHz",
+        "status": "AVAILABLE"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          85.282,
+          26.768
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "team_id": "team_nepal_army_gaur",
+        "name": "NEPAL ARMY GAUR DISASTER CONTINGENT",
+        "lead_unit": false,
+        "vessel_type": "Assault Boat Squadron (Cap 18)",
+        "crew_size": 10,
+        "radio": "148.6 MHz",
+        "status": "AVAILABLE"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          85.271,
+          26.757
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "team_id": "team_redcross_rautahat",
+        "name": "NEPAL RED CROSS RAUTAHAT CHAPTER",
+        "lead_unit": false,
+        "vessel_type": "Medical Zodiac Raft (Cap 12)",
+        "crew_size": 6,
+        "contact": "+977-55-520250",
+        "status": "AVAILABLE"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          85.2775,
+          26.7645
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "team_id": "team_lalbakaiya_patrol",
+        "name": "LALBAKAIYA TIKULIYA FLOOD UNIT",
+        "lead_unit": false,
+        "vessel_type": "Light Motor Raft (Cap 10)",
+        "crew_size": 4,
+        "radio": "146.2 MHz",
+        "status": "AVAILABLE"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          85.241,
+          26.784
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "team_id": "team_chandrapur_sdrf",
+        "name": "CHANDRAPUR HIGHWAY DISASTER WING",
+        "lead_unit": false,
+        "vessel_type": "Heavy 4x4 & Raft Unit (Cap 14)",
+        "crew_size": 8,
+        "contact": "+977-55-540111",
+        "status": "AVAILABLE"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          85.34,
+          27.125
+        ]
+      }
+    }
+  ]
+}
