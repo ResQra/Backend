@@ -20,3 +20,8 @@ def update_occupancy(shelter_id: str, current_occupancy: int) -> dict | None:
         ReturnValues="ALL_NEW",
     )
     return resp.get("Attributes")
+
+
+def get_shelter(shelter_id: str) -> dict | None:
+    resp = table(TABLE).get_item(Key={"id": shelter_id})
+    return resp.get("Item")

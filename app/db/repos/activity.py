@@ -3,7 +3,7 @@ import uuid
 
 from boto3.dynamodb.conditions import Key
 
-from app.db.client import table
+from app.db.client import table, to_dynamo_friendly
 
 TABLE = "ActivityEvent"
 
@@ -20,7 +20,7 @@ def log_event(actor: str, type_: str, summary: str, payload: dict | None = None)
     }
     if payload:
         item["payload"] = payload
-    table(TABLE).put_item(Item=item)
+    table(TABLE).put_item(Item=to_dynamo_friendly(item))
     return item
 
 

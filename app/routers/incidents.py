@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends
 
+from app.agents_gateway import gateway
 from app.auth.deps import CurrentUser, get_current_user
 from app.db.repos import activity, incidents, users
 from app.models import IncidentCreate
@@ -89,6 +90,28 @@ async def create_incident(body: IncidentCreate, user: CurrentUser = Depends(get_
         "mission_id": None,
     }
     incidents.create_incident(item)
+
+    # F03: score immediately through the PriorityAgent seam. Best-effort —
+    # if no agent runtime is configured the incident keeps "awaiting triage"
+    # and the coordinator can still act on it.
+    try:
+        item["priority"] = await gateway.triage_score(item)
+        incidents.update_incident(item["id"], priority=item["priority"])
+        activity.log_event(
+            actor="agent",
+            type_="priority_scored",
+            summary=(
+                f"PriorityAgent scored {item['id']}: {item['priority']['score']} "
+                f"({item['priority']['band']})"
+            ),
+            payload={
+                "incident_id": item["id"],
+                "score": item["priority"]["score"],
+                "band": item["priority"]["band"],
+            },
+        )
+    except gateway.AgentNotConnectedError:
+        pass
 
     if verification == "GEOCODED":
         activity.log_event(

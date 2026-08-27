@@ -24,3 +24,13 @@ def get_dynamo_resource():
 
 def table(name: str):
     return get_dynamo_resource().Table(name)
+
+
+def to_dynamo_friendly(obj):
+    """Converts any floats in nested dicts/lists to Decimal for safe DynamoDB persistence."""
+    import json
+    from decimal import Decimal
+    if obj is None:
+        return None
+    return json.loads(json.dumps(obj, default=str), parse_float=Decimal)
+

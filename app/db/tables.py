@@ -156,4 +156,49 @@ TABLES: dict[str, dict] = {
             },
         ],
     },
+    "PendingActions": {
+        "KeySchema": [{"AttributeName": "id", "KeyType": "HASH"}],
+        "AttributeDefinitions": [
+            {"AttributeName": "id", "AttributeType": "S"},
+            {"AttributeName": "state", "AttributeType": "S"},
+            {"AttributeName": "created_at", "AttributeType": "N"},
+            {"AttributeName": "incident_id", "AttributeType": "S"},
+        ],
+        "GlobalSecondaryIndexes": [
+            {
+                "IndexName": "state-created-index",
+                "KeySchema": [
+                    {"AttributeName": "state", "KeyType": "HASH"},
+                    {"AttributeName": "created_at", "KeyType": "RANGE"},
+                ],
+                "Projection": {"ProjectionType": "ALL"},
+            },
+            {
+                "IndexName": "incident-created-index",
+                "KeySchema": [
+                    {"AttributeName": "incident_id", "KeyType": "HASH"},
+                    {"AttributeName": "created_at", "KeyType": "RANGE"},
+                ],
+                "Projection": {"ProjectionType": "ALL"},
+            },
+        ],
+    },
+    "SimulationEvents": {
+        "KeySchema": [{"AttributeName": "idempotency_key", "KeyType": "HASH"}],
+        "AttributeDefinitions": [
+            {"AttributeName": "idempotency_key", "AttributeType": "S"},
+            {"AttributeName": "event_type", "AttributeType": "S"},
+            {"AttributeName": "created_at", "AttributeType": "N"},
+        ],
+        "GlobalSecondaryIndexes": [
+            {
+                "IndexName": "type-created-index",
+                "KeySchema": [
+                    {"AttributeName": "event_type", "KeyType": "HASH"},
+                    {"AttributeName": "created_at", "KeyType": "RANGE"},
+                ],
+                "Projection": {"ProjectionType": "ALL"},
+            },
+        ],
+    },
 }

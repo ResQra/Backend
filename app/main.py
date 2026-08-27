@@ -1,10 +1,16 @@
+import asyncio
+import logging
+
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.routers import auth, chat, incidents, ops, public, users
+from app.routers import auth, area, chat, disasters, incidents, ops, public, users, ws
+from app.services.broadcast import manager as broadcast_manager
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="ResQra API",
@@ -40,8 +46,32 @@ def health():
 
 
 app.include_router(auth.router)
+app.include_router(area.router)
+app.include_router(disasters.router)
 app.include_router(incidents.router)
 app.include_router(chat.router)
 app.include_router(users.router)
 app.include_router(public.router)
 app.include_router(ops.router)
+app.include_router(ws.router)
+
+
+@app.on_event("startup")
+async def on_startup():
+    broadcast_manager.set_event_loop(asyncio.get_running_loop())
+
+    def _snapshot():
+        from app.db.repos import incidents, teams, simulation_events
+
+        return {
+            "incidents": incidents.list_open_incidents(),
+            "teams": teams.list_teams(),
+            "sensor_events": simulation_events.list_by_type("WATER_LEVEL", limit=10)
+            + simulation_events.list_by_type("ROAD_BLOCKED", limit=10)
+            + simulation_events.list_by_type("BRIDGE_BLOCKED", limit=10)
+            + simulation_events.list_by_type("PEOPLE_DENSITY", limit=10)
+            + simulation_events.list_by_type("FLOOD_AREA", limit=10),
+        }
+
+    broadcast_manager.set_snapshot_fn(_snapshot)
+    logger.info("WebSocket endpoint available at /ws/ops")

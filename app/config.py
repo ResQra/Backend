@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     groq_model: str = "openai/gpt-oss-120b"
 
+    # Strands agent runtime. Empty URL = use the local agents/ project in
+    # dev mode; set to the deployed agent base URL after deployment, e.g.
+    # https://agent.example.com  (POST {url}/tasks with a task envelope).
+    resqra_agent_url: str = ""
+    # Optional override for where the standalone agents/ project lives when
+    # running agents locally (defaults to <repo root>/agents).
+    resqra_agents_path: str = ""
+
     # OTP login (residents). Dev mode returns the code in the API response
     # and logs it instead of sending SMS — flip to false once an SMS
     # provider is wired into app/auth/otp.py::send_sms.

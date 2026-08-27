@@ -31,3 +31,12 @@ def update_team(team_id: str, **fields) -> dict | None:
         ReturnValues="ALL_NEW",
     )
     return resp.get("Attributes")
+
+
+def update_location(team_id: str, location: dict, source: str = "team") -> dict | None:
+    return update_team(
+        team_id,
+        location=location,
+        location_source=source,
+        updated_at=location.get("updated_at"),
+    )

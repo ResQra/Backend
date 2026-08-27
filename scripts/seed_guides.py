@@ -273,11 +273,9 @@ GUIDES = [
 
 def main() -> None:
     for g in GUIDES:
-        item = {k: v for k, v in g.items() if v is not None}
-        item["updated_at"] = NOW
-        guides.put_guide(item)
-        print(f"+ guide {g['id']} ({g['language']}) — {g['title']}")
-    print(f"done — {len(GUIDES)} guides seeded")
+        guides.put_guide(g)
+        print(f"+ guide {g['id']} ({g['language']})")
+    print(f"seeded {len(GUIDES)} guides across {len(set(g['category'] for g in GUIDES))} categories")
 
 
 if __name__ == "__main__":

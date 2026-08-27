@@ -73,6 +73,12 @@ class AssignRequest(BaseModel):
     team_id: str
 
 
+class ApprovalDecision(BaseModel):
+    decision: Literal["APPROVED", "REJECTED"]
+    note: str = Field(default="", max_length=500)
+    override_team_id: str | None = None
+
+
 class TeamCreate(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     capacity: int = Field(ge=1, le=500)
@@ -85,6 +91,36 @@ class TeamCreate(BaseModel):
 
 class TeamStatusUpdate(BaseModel):
     status: Literal["AVAILABLE", "ON_MISSION", "RETURNING", "OFFLINE"]
+
+
+class TeamLocationUpdate(BaseModel):
+    lat: float
+    lng: float
+    label: str = ""
+    source: Literal["TEAM", "SIMULATION", "COORDINATOR"] = "TEAM"
+
+
+class TeamProblemReport(BaseModel):
+    message: str = Field(min_length=3, max_length=1000)
+    severity: Literal["INFO", "WARNING", "BLOCKED", "OFFLINE"] = "WARNING"
+    lat: float | None = None
+    lng: float | None = None
+
+
+class SensorEventCreate(BaseModel):
+    kind: Literal["WATER_LEVEL", "ROAD_BLOCKED", "BRIDGE_BLOCKED", "PEOPLE_DENSITY", "FLOOD_AREA"]
+    lat: float
+    lng: float
+    value: float | None = None
+    level: Literal["SAFE", "WATCH", "RISING", "UNSAFE", "HOTSPOT"] = "RISING"
+    note: str = Field(default="", max_length=1000)
+    source_priority: Literal["SIMULATION", "TEAM", "PUBLIC_API"] = "SIMULATION"
+    idempotency_key: str | None = None
+
+
+class ShelterOccupancyUpdate(BaseModel):
+    current_occupancy: int = Field(ge=0)
+    source: Literal["SIMULATION", "COORDINATOR", "TEAM"] = "COORDINATOR"
 
 
 # --- Chat ---

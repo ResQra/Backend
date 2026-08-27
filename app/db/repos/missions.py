@@ -15,3 +15,18 @@ def get_mission(mission_id: str) -> dict | None:
 
 def list_missions() -> list[dict]:
     return table(TABLE).scan().get("Items", [])
+
+
+def create_for_assignment(incident_id: str, team_id: str, pending_action_id: str | None = None) -> dict:
+    import time
+    import uuid
+
+    item = {
+        "id": f"mis_{uuid.uuid4().hex[:12]}",
+        "incident_id": incident_id,
+        "team_id": team_id,
+        "status": "ACTIVE",
+        "started_at": int(time.time() * 1000),
+        "pending_action_id": pending_action_id,
+    }
+    return create_mission(item)

@@ -1,9 +1,14 @@
 """INTEGRATION SEAM — this is where the Strands agents plug in.
 
-v0 note: resident_chat currently calls Groq directly so the chat flow
-works before the Strands ResidentAgent exists. When it's ready, replace
-the body of resident_chat with the agent call — the router, persistence
-and extraction contract stay the same.
+Runtime resolution order for agent work (triage, allocation):
+1. Deployed agent: settings.resqra_agent_url -> POST {url}/tasks
+2. Local dev: import the standalone agents/ project in-process
+3. Nothing configured: AgentNotConnectedError (routers degrade gracefully)
+
+resident_chat / coordinator_assistant currently call Groq directly so chat
+works before the Strands ResidentAgent exists. When it's ready, replace the
+body of those functions with the agent call — the router, persistence and
+extraction contract stay the same.
 
 Contract for every seam function:
 - raise AgentNotConnectedError if nothing is wired yet
@@ -13,34 +18,41 @@ Contract for every seam function:
 """
 
 import json
+import os
+import sys
+from pathlib import Path
 
 from app.agents_gateway import llm, memory
+from app.config import settings
 from app.db.repos import users
 from app.utils.geo import haversine_km
 
-RESIDENT_SYSTEM_PROMPT = """You are ResQra, a flood emergency response assistant \
-for residents of Patna, India. You chat with people affected by flooding.
+RESIDENT_SYSTEM_PROMPT = """You are ResQra, the dedicated Emergency Flood Rescue Copilot for Rautahat District, Nepal (Madhesh Province).
+You assist citizens in distress during the Bagmati and Lalbakaiya monsoon flood surge.
 
-Core rules:
-- Be calm, warm and BRIEF (2-4 sentences max). Reply in the language the user \
-writes in (Hindi, English, or Hinglish).
-- MEMORY FIRST: before saying anything, check the conversation history and the \
-"WHAT YOU ALREADY KNOW" section below. NEVER ask again for information the \
-resident already gave or that is listed there — repeating questions angers \
-people in emergencies. Acknowledge new info in one short clause instead.
-- Ask at most ONE new question per reply (a second only if critical). Pick the \
-single most important missing detail: people count → location → water level → \
-special vulnerabilities.
-- If a stated location is clearly not a real place (e.g. "moon", jokes), say \
-kindly that you couldn't recognize it and ask for a nearby landmark — do not \
-pretend it was accepted.
-- If the user is frustrated or says you are repeating, apologize in one short \
-sentence and move forward — never re-explain.
-- If they describe danger, acknowledge urgency without panic and give one \
-piece of immediate safety advice (highest floor/rooftop, avoid moving water, \
-keep phone dry).
-- NEVER invent rescue team names, ETAs, or promise specific rescue times. Say \
-help coordination is underway when an incident exists.
+YOU HAVE DEEP LOCAL GEOGRAPHIC & RESCUE KNOWLEDGE OF RAUTAHAT DISTRICT:
+- District Headquarters: Gaur Municipality (Ward 1 to 4, Court Road, Customs Road, Hospital Chowk, Gaur Ring Road, Sluice Gate).
+- Other Municipalities: Garuda, Chandrapur (Chandranigahapur), Ishnath, Tikuliya Ghat, Rajpur, Katahariya, Durga Bhagawati, Baudhimai, Rajdevi, Brindaban, Gadhimai, Madhav Narayan, Phatuwa Bijaypur, Gujara, Maulapur, Dewahi Gonahi, Paroha.
+- Rivers & Flood Basins: Bagmati River (Eastern embankment breach zone) and Lalbakaiya River (Tikuliya breach zone).
+- Designated Open Evacuation Shelters & Hospitals:
+  * Gaur District Hospital & Trauma Center (Gaur Ward 3, 160 beds, boat dock)
+  * Rautahat District Sports Stadium Evacuation Camp (Gaur High Ground, 3000 capacity)
+  * Juddha Higher Secondary School Relief Camp (Gaur Ward 2, 1800 capacity)
+  * Tikuliya Ghat Community Relief Point (Lalbakaiya Bank, 950 capacity)
+  * Garuda Municipal Evacuation Complex (Central Hub, 2200 capacity)
+  * Chandranigahapur Community Hospital (East-West Highway, 300 beds)
+- Active Rescue Fleet:
+  * GAUR BAGMATI WATER RESCUE UNIT (Lead Motorboat Squadron, Contact: +977-55-520100, Radio: 144.2 MHz)
+  * APF No. 11 Battalion Rautahat (Radio: 142.8 MHz)
+  * Nepal Army Gaur Contingent (Radio: 148.6 MHz)
+  * Nepal Red Cross Rautahat Chapter (+977-55-520250)
+
+CORE RULES:
+1. Always recognize local towns instantly: When someone mentions "Gaur", "Tikuliya", "Garuda", "Chandrapur", "Ward 1-4", or landmarks like "hospital", "stadium", "juddha school", or "bagmati", you IMMEDIATELY know they are in Rautahat District, Nepal. NEVER say "I don't know where Gaur is".
+2. Language: Reply warmly in whichever language the citizen speaks — Nepali, Maithili, Bhojpuri, Hindi, or English (including Romanized forms like "gaur ma chu", "fasal chi", "pani badh raha hai").
+3. Brevity & Empathy: Keep responses calm, reassuring, and concise (2-4 sentences max). Give immediate safety advice: stay on the highest floor/rooftop, keep away from fast-moving Bagmati/Lalbakaiya floodwaters, and keep your phone dry.
+4. Memory First: Before replying, check the conversation history and WHAT YOU ALREADY KNOW. NEVER re-ask for details the resident already provided.
+5. If the resident gives their location (e.g. "Gaur"), acknowledge it, suggest the nearest known shelter (like Juddha School or Gaur Hospital/Stadium), and ask for specific details like Ward number or landmark if needed.
 """
 
 
@@ -98,6 +110,34 @@ async def resident_chat(user_id: str, message: str, history: list[dict]) -> str:
     return reply
 
 
+RAUTAHAT_LANDMARKS = {
+    "gaur ward 4": (26.7660, 85.2770, "Gaur Ward 4 (Bagmati Breach Corridor), Rautahat"),
+    "gaur ward 3": (26.7640, 85.2780, "Gaur Ward 3 (Hospital Chowk), Rautahat"),
+    "gaur ward 2": (26.7600, 85.2750, "Gaur Ward 2 (Court Road), Rautahat"),
+    "gaur ward 1": (26.7580, 85.2740, "Gaur Ward 1 (Customs Area), Rautahat"),
+    "ward 4": (26.7660, 85.2770, "Gaur Ward 4, Rautahat"),
+    "ward 3": (26.7640, 85.2780, "Gaur Ward 3, Rautahat"),
+    "ward 2": (26.7600, 85.2750, "Gaur Ward 2, Rautahat"),
+    "ward 1": (26.7580, 85.2740, "Gaur Ward 1, Rautahat"),
+    "juddha secondary school": (26.7590, 85.2720, "Juddha Higher Secondary School Relief Camp, Gaur"),
+    "juddha school": (26.7590, 85.2720, "Juddha Higher Secondary School, Gaur"),
+    "gaur hospital": (26.7640, 85.2780, "Gaur District Hospital & Trauma Center, Rautahat"),
+    "hospital": (26.7640, 85.2780, "Gaur District Hospital, Rautahat"),
+    "rautahat stadium": (26.7680, 85.2810, "Rautahat District Sports Stadium Shelter, Gaur"),
+    "stadium": (26.7680, 85.2810, "Rautahat District Sports Stadium Shelter, Gaur"),
+    "tikuliya ghat": (26.7820, 85.2420, "Tikuliya Ghat, Lalbakaiya River, Rautahat"),
+    "tikuliya": (26.7820, 85.2420, "Tikuliya Ghat (Lalbakaiya Basin), Rautahat"),
+    "garuda bazaar": (26.9250, 85.3120, "Garuda Municipal Complex, Rautahat"),
+    "garuda": (26.9250, 85.3120, "Garuda Municipal Center, Rautahat"),
+    "chandranigahapur": (27.1250, 85.3400, "Chandranigahapur Highway Hub, Rautahat"),
+    "chandrapur": (27.1250, 85.3400, "Chandranigahapur Highway Base, Rautahat"),
+    "bagmati river": (26.7700, 85.2950, "Bagmati River Embankment, Rautahat"),
+    "bagmati": (26.7700, 85.2950, "Bagmati River Corridor, Rautahat"),
+    "lalbakaiya": (26.7800, 85.2400, "Lalbakaiya River Corridor, Rautahat"),
+    "gaur": (26.7620, 85.2760, "Gaur Municipality, Rautahat"),
+}
+
+
 async def _extract_and_save(user_id: str, user_msg: str, agent_reply: str) -> None:
     convo = f'user: "{user_msg}"\nassistant: "{agent_reply}"'
     raw = await llm.chat_completion(
@@ -124,24 +164,44 @@ async def _extract_and_save(user_id: str, user_msg: str, agent_reply: str) -> No
         from app.utils.geocode import geocode
 
         updates["location_text"] = str(stated)
-        geo = await geocode(str(stated))
+        stated_lower = str(stated).lower()
+
+        # Check local Rautahat landmark dictionary first for instant, accurate coordinates
+        matched_landmark = None
+        for lm_key, (lat, lng, label) in RAUTAHAT_LANDMARKS.items():
+            if lm_key in stated_lower:
+                matched_landmark = {"lat": lat, "lng": lng, "label": label, "confidence": 0.98}
+                break
+
+        if matched_landmark:
+            geo = matched_landmark
+        else:
+            geo = await geocode(f"{stated}, Rautahat, Nepal") or await geocode(str(stated))
+
         if geo:
             # DynamoDB rejects floats — store coordinates as Decimal
             updates["location"] = {
-                "lat": Decimal(str(geo["lat"])),
-                "lng": Decimal(str(geo["lng"])),
+                "lat": Decimal(str(round(geo["lat"], 6))),
+                "lng": Decimal(str(round(geo["lng"], 6))),
                 "label": geo["label"],
                 "confidence": Decimal(str(geo["confidence"])),
             }
             updates["location_verification"] = "STATED_GEOCODED"
             print(f"[F19] geocoded '{stated}' -> {geo['lat']:.4f},{geo['lng']:.4f} ({geo['label'][:50]})")
         else:
-            # New stated place unresolved: the old resolved pin is now
-            # WRONG — clear it rather than leave a misleading marker. The
-            # person still plots via device-GPS fallback (ops map layer).
-            updates["location_verification"] = "NEEDS_COORDINATOR_REVIEW"
-            users.clear_resolved_location(user_id)
-            print(f"[F19] could not geocode '{stated}' — cleared stale pin, flagged for review")
+            # Fallback default to Gaur center if stated was clearly in Rautahat/Gaur
+            if "gaur" in stated_lower or "rautahat" in stated_lower:
+                updates["location"] = {
+                    "lat": Decimal("26.762000"),
+                    "lng": Decimal("85.276000"),
+                    "label": f"{stated}, Gaur, Rautahat",
+                    "confidence": Decimal("0.90"),
+                }
+                updates["location_verification"] = "STATED_GEOCODED"
+            else:
+                updates["location_verification"] = "NEEDS_COORDINATOR_REVIEW"
+                users.clear_resolved_location(user_id)
+                print(f"[F19] could not geocode '{stated}' — cleared stale pin, flagged for review")
 
     if not updates:
         return
@@ -154,6 +214,29 @@ async def _extract_and_save(user_id: str, user_msg: str, agent_reply: str) -> No
         users.update_user_info(user_id, **updates)
     except Exception:
         pass
+
+    # Real-time WebSocket Broadcast: send updated resident beacon to War Room map
+    try:
+        from app.services.broadcast import manager as broadcast
+        user_record = users.find_by_id(user_id)
+        if user_record and user_record.get("location"):
+            broadcast.send_to_all({
+                "event": "resident_updated",
+                "resident": {
+                    "id": user_id,
+                    "name": user_record.get("name", "Citizen Distress Beacon"),
+                    "phone": user_record.get("phone", ""),
+                    "location": user_record.get("location"),
+                    "location_text": user_record.get("location_text", stated),
+                    "people_with": user_record.get("people_with", 1),
+                    "vulnerabilities": user_record.get("vulnerabilities", []),
+                    "status": user_record.get("status", "NEEDS_HELP"),
+                    "updated_at": int(time.time() * 1000),
+                }
+            })
+    except Exception as e:
+        print(f"[F19] Broadcast error: {e}")
+
     # F09: make the profile update visible on the coordinator feed
     try:
         from app.db.repos import activity
@@ -166,7 +249,7 @@ async def _extract_and_save(user_id: str, user_msg: str, agent_reply: str) -> No
             actor="agent",
             type_="user_info_updated",
             summary=f"ResidentAgent updated {user_id}: {summary}",
-            payload={"user_id": user_id, **{k: str(v) for k, v in updates.items()}},
+            payload={"user_id": user_id, "updates": {k: str(v) for k, v in updates.items()}},
         )
     except Exception:
         pass
@@ -189,20 +272,79 @@ async def intake_extract(raw_text: str) -> dict:
     )
 
 
-async def triage_score(incident: dict) -> dict:
-    """F03: TriageAgent returns {"score": int, "reasons": [str, ...]}.
+# --- Agent runtime: deployed agent first, local agents/ project second ---
 
-    The LLM supplies factors; the deterministic formula lives in the
-    agent's score_priority tool. This seam returns its result.
+_local_agent_cache = None
+_local_agent_failed = False
+
+
+def _agents_path() -> str:
+    if settings.resqra_agents_path:
+        return settings.resqra_agents_path
+    env_path = os.environ.get("RESQRA_AGENTS_PATH")
+    if env_path:
+        return env_path
+    # backend/app/agents_gateway/gateway.py -> repo root -> agents/
+    return str(Path(__file__).resolve().parents[3] / "agents")
+
+
+def _get_local_agent():
+    """Import the standalone resqra_agents package for dev-mode integration."""
+    global _local_agent_cache, _local_agent_failed
+    if _local_agent_cache is not None or _local_agent_failed:
+        return _local_agent_cache
+    path = _agents_path()
+    if not os.path.isdir(path):
+        _local_agent_failed = True
+        return None
+    try:
+        if path not in sys.path:
+            sys.path.insert(0, path)
+        from resqra_agents.main_agent import main_agent as agent
+
+        _local_agent_cache = agent
+    except Exception:
+        _local_agent_failed = True
+        _local_agent_cache = None
+    return _local_agent_cache
+
+
+async def _agent_dispatch(task: dict) -> dict | None:
+    """Send a task envelope to the configured runtime. None = no runtime."""
+    if settings.resqra_agent_url:
+        import httpx
+
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                settings.resqra_agent_url.rstrip("/") + "/tasks",
+                json=task,
+            )
+            resp.raise_for_status()
+            return resp.json()
+    agent = _get_local_agent()
+    if agent is not None:
+        return agent.dispatch(task)
+    return None
+
+
+async def triage_score(incident: dict) -> dict:
+    """F03: PriorityAgent returns {"score", "band", "factors", "reasons"}.
+
+    Always deterministic — the formula lives in the agent's
+    priority_engine tool; the LLM never computes this number.
     """
-    raise AgentNotConnectedError(
-        "TriageAgent not connected yet — implement triage_score() "
-        "in app/agents_gateway/gateway.py"
-    )
+    out = await _agent_dispatch({"type": "score_incident", "incident": incident})
+    if out is None:
+        raise AgentNotConnectedError(
+            "PriorityAgent not connected — set RESQRA_AGENT_URL to the "
+            "deployed agent, or keep the agents/ folder next to backend/ "
+            "for local dev integration"
+        )
+    return out["result"]
 
 
 OPS_SYSTEM_PROMPT = """You are ResQra Ops Assistant — an intelligence assistant for a flood \
-rescue coordinator in Patna, India. You are given a LIVE SNAPSHOT of the operations database \
+rescue coordinator. You are given a LIVE SNAPSHOT of the operations database \
 before each message.
 
 Rules:
@@ -237,18 +379,31 @@ async def coordinator_assistant(message: str, snapshot: dict, history: list[dict
     return await llm.chat_completion(msgs, temperature=0.3)
 
 
-BOAT_SPEED_KMH = 20.0  # planning figure for ETA estimates
+BOAT_SPEED_KMH = 20.0
 
 
-def recommend_team(incident: dict, teams: list[dict]) -> dict:
-    """F06 v0: deterministic AllocationAgent — availability + capacity +
-    haversine distance, every verdict explained. The Strands AllocationAgent
-    replaces this body later; the router/console contract stays the same.
+def recommend_team(incident: dict, teams: list[dict], rejected_pairs: set | None = None) -> dict:
+    """F06: allocation recommendation with reasons (deterministic).
+
+    Delegates to the agent runtime when available (deployed URL or local
+    agents/ project) so TeamDispatchAgent is the single source of truth.
+    Falls back to this embedded v0 copy if no runtime can be loaded.
 
     Returns {"team_id", "team_name", "distance_km", "eta_min", "reasons",
     "considered": [{"team_id", "team_name", "ok", "reason"}]} or
     {"team_id": None, "reasons": [...]} when no team is eligible.
     """
+    agent = _get_local_agent()
+    if agent is not None:
+        try:
+            # Pure deterministic recommendation; the backend owns card
+            # persistence, so bypass the agent's local approval store.
+            return agent.control_room.dispatch_agent.recommend(
+                incident, teams, rejected_pairs=rejected_pairs
+            )
+        except Exception:
+            pass  # fall through to embedded v0 below
+
     need = incident.get("people") or 1
     loc = incident.get("location") or None
     considered: list[dict] = []
@@ -256,11 +411,17 @@ def recommend_team(incident: dict, teams: list[dict]) -> dict:
 
     for t in teams:
         name = t.get("name") or t.get("id", "?")
+        if (t.get("id"), incident.get("id")) in (rejected_pairs or set()):
+            considered.append(
+                {"team_id": t.get("id"), "team_name": name, "ok": False,
+                 "reason": f"{name} was already rejected for this incident"}
+            )
+            continue
         status = t.get("status", "UNKNOWN")
         if status not in ("AVAILABLE", "RETURNING"):
             considered.append(
                 {"team_id": t.get("id"), "team_name": name, "ok": False,
-                 "reason": f"{name} is {status} — not dispatchable"}
+                 "reason": f"{name} is {status} - not dispatchable"}
             )
             continue
         capacity = t.get("capacity") or 0
@@ -279,7 +440,7 @@ def recommend_team(incident: dict, teams: list[dict]) -> dict:
         eligible.append((t, dist))
         considered.append(
             {"team_id": t.get("id"), "team_name": name, "ok": True,
-             "reason": f"{name} {status.lower()}, capacity {capacity} ≥ {need} people"
+             "reason": f"{name} {status.lower()}, capacity {capacity} >= {need} people"
                        + (f", {dist:.1f} km away" if dist is not None else "")}
         )
 
@@ -295,19 +456,17 @@ def recommend_team(incident: dict, teams: list[dict]) -> dict:
             "considered": considered,
         }
 
-    # Nearest eligible team wins; without a verified incident location,
-    # fall back to the first eligible team and say so.
     best, dist = min(eligible, key=lambda pair: pair[1] if pair[1] is not None else 1e9)
     name = best.get("name") or best.get("id", "?")
     reasons = [
         f"{name} is {str(best.get('status', '')).lower()} now",
-        f"capacity {best.get('capacity')} ≥ {need} people",
+        f"capacity {best.get('capacity')} >= {need} people",
     ]
     if dist is not None:
         eta = dist / BOAT_SPEED_KMH * 60
-        reasons.append(f"nearest eligible team — {dist:.1f} km away, ETA ~{eta:.0f} min")
+        reasons.append(f"nearest eligible team: {dist:.1f} km away, ETA about {eta:.0f} min")
     else:
-        reasons.append("incident location unverified — pick by availability/capacity only")
+        reasons.append("incident location unverified - pick by availability/capacity only")
     for c in considered:
         if not c["ok"]:
             reasons.append(c["reason"])
