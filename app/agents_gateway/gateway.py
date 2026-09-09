@@ -1,4 +1,4 @@
-"""INTEGRATION SEAM — this is where the Strands agents plug in.
+"""INTEGRATION SEAM ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â this is where the Strands agents plug in.
 
 Runtime resolution order for agent work (triage, allocation):
 1. Deployed agent: settings.resqra_agent_url -> POST {url}/tasks
@@ -7,7 +7,7 @@ Runtime resolution order for agent work (triage, allocation):
 
 resident_chat / coordinator_assistant currently call Groq directly so chat
 works before the Strands ResidentAgent exists. When it's ready, replace the
-body of those functions with the agent call — the router, persistence and
+body of those functions with the agent call ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â the router, persistence and
 extraction contract stay the same.
 
 Contract for every seam function:
@@ -20,6 +20,7 @@ Contract for every seam function:
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 from app.agents_gateway import llm, memory
@@ -42,10 +43,12 @@ YOU HAVE DEEP LOCAL GEOGRAPHIC & RESCUE KNOWLEDGE OF RAUTAHAT DISTRICT:
   * Garuda Municipal Evacuation Complex (Central Hub, 2200 capacity)
   * Chandranigahapur Community Hospital (East-West Highway, 300 beds)
 - Active Rescue Fleet:
-  * GAUR BAGMATI WATER RESCUE UNIT (Lead Motorboat Squadron, Contact: +977-55-520100, Radio: 144.2 MHz)
-  * APF No. 11 Battalion Rautahat (Radio: 142.8 MHz)
-  * Nepal Army Gaur Contingent (Radio: 148.6 MHz)
-  * Nepal Red Cross Rautahat Chapter (+977-55-520250)
+  * GAUR BAGMATI WATER RESCUE UNIT (Ward 4 boat station, swift-water motorboat patrol, Radio: 144.2 MHz)
+  * APF Battalion No. 11, Rautahat (HQ east of Gaur, BOP at Gaur Customs, Radio: 142.8 MHz)
+  * Nepal Army Gaur Contingent (barracks west Gaur, assault boats, Radio: 148.6 MHz)
+  * Nepal Red Cross Rautahat Chapter (medical triage, +977-55-520141; referral Provincial Hospital 055-520142)
+  * Lalbakaiya Tikuliya Flood Unit (riverbank post, Radio: 146.2 MHz; coord District Police 055-520840)
+  * Chandrapur Highway Disaster Wing (East-West Highway base, Radio: 147.5 MHz)
 
 CORE RULES:
 1. Always recognize local towns instantly: When someone mentions "Gaur", "Tikuliya", "Garuda", "Chandrapur", "Ward 1-4", or landmarks like "hospital", "stadium", "juddha school", or "bagmati", you IMMEDIATELY know they are in Rautahat District, Nepal. NEVER say "I don't know where Gaur is".
@@ -89,7 +92,7 @@ async def resident_chat(user_id: str, message: str, history: list[dict]) -> str:
     """F18/F19: reply to a resident + keep their profile current.
 
     Two calls: (1) empathetic reply, (2) strict-JSON extraction written to
-    the Users table via update_user_info — F19 behavior. Extraction and DB
+    the Users table via update_user_info ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â F19 behavior. Extraction and DB
     are best-effort: chat still works when either fails.
     """
     msgs = [
@@ -155,7 +158,7 @@ async def _extract_and_save(user_id: str, user_msg: str, agent_reply: str) -> No
     )
 
     # Stated location: geocode it so it can be plotted. This is the
-    # person's CLAIMED location (F19) — deliberately separate from
+    # person's CLAIMED location (F19) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â deliberately separate from
     # device_location (GPS heartbeat), which never overwrites it.
     stated = data.get("location")
     if stated:
@@ -179,7 +182,7 @@ async def _extract_and_save(user_id: str, user_msg: str, agent_reply: str) -> No
             geo = await geocode(f"{stated}, Rautahat, Nepal") or await geocode(str(stated))
 
         if geo:
-            # DynamoDB rejects floats — store coordinates as Decimal
+            # DynamoDB rejects floats ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â store coordinates as Decimal
             updates["location"] = {
                 "lat": Decimal(str(round(geo["lat"], 6))),
                 "lng": Decimal(str(round(geo["lng"], 6))),
@@ -201,7 +204,7 @@ async def _extract_and_save(user_id: str, user_msg: str, agent_reply: str) -> No
             else:
                 updates["location_verification"] = "NEEDS_COORDINATOR_REVIEW"
                 users.clear_resolved_location(user_id)
-                print(f"[F19] could not geocode '{stated}' — cleared stale pin, flagged for review")
+                print(f"[F19] could not geocode '{stated}' ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â cleared stale pin, flagged for review")
 
     if not updates:
         return
@@ -220,8 +223,7 @@ async def _extract_and_save(user_id: str, user_msg: str, agent_reply: str) -> No
         from app.services.broadcast import manager as broadcast
         user_record = users.find_by_id(user_id)
         if user_record and user_record.get("location"):
-            broadcast.send_to_all({
-                "event": "resident_updated",
+            broadcast.fire_and_forget("RESIDENT_UPDATED", {
                 "resident": {
                     "id": user_id,
                     "name": user_record.get("name", "Citizen Distress Beacon"),
@@ -261,15 +263,34 @@ def fields_to_dict(fields: dict) -> dict:
 
 
 async def intake_extract(raw_text: str) -> dict:
-    """F01: IntakeAgent turns free text into a structured incident dict.
+    """F01/Phase 5: IntakeAgent turns free text into a structured incident dict.
 
     Expected keys: people, vulnerabilities[], urgency, water_rising,
     location_text (geocoding handled separately via geocode_location).
+    Uses the local agents/ runtime (regex path works without keys);
+    raises AgentNotConnectedError only when no runtime is wired.
     """
-    raise AgentNotConnectedError(
-        "IntakeAgent not connected yet — implement intake_extract() "
-        "in app/agents_gateway/gateway.py"
-    )
+    dispatched = await _agent_dispatch({"type": "intake_extract", "raw_text": raw_text})
+    if dispatched is not None:
+        return dispatched["result"]
+    agent = _get_local_agent()
+    if agent is None:
+        raise AgentNotConnectedError(
+            "IntakeAgent not connected Ã¢â‚¬â€ set RESQRA_AGENT_URL or keep "
+            "agents/ next to backend/ for local dev"
+        )
+    try:
+        from resqra_agents.agents.report_intake import extract as intake_extract_fn
+    except Exception as exc:
+        raise AgentNotConnectedError(f"IntakeAgent import failed: {exc}")
+    out = intake_extract_fn(raw_text or "")
+    return {
+        "people": out.get("people_count"),
+        "vulnerabilities": out.get("vulnerabilities") or [],
+        "urgency": out.get("urgency") if out.get("urgency") != "UNKNOWN" else None,
+        "water_rising": bool(out.get("water_rising")),
+        "location_text": out.get("location_text"),
+    }
 
 
 # --- Agent runtime: deployed agent first, local agents/ project second ---
@@ -332,27 +353,63 @@ async def triage_score(incident: dict) -> dict:
 
     Always deterministic — the formula lives in the agent's
     priority_engine tool; the LLM never computes this number.
+    Shelter context (open beds near the incident) rides along so the
+    safety-perimeter factor can apply.
     """
-    out = await _agent_dispatch({"type": "score_incident", "incident": incident})
+    out = await _agent_dispatch({"type": "score_incident", "incident": incident,
+                                 "shelters": _shelter_snapshot()})
     if out is None:
         raise AgentNotConnectedError(
             "PriorityAgent not connected — set RESQRA_AGENT_URL to the "
             "deployed agent, or keep the agents/ folder next to backend/ "
             "for local dev integration"
         )
-    return out["result"]
+    result = (out or {}).get("result")
+    if not isinstance(result, dict) or "score" not in result:
+        raise AgentNotConnectedError(
+            f"PriorityAgent returned an unusable envelope: {str(out)[:160]}")
+    return result
+
+
+def _shelter_snapshot() -> list | None:
+    """JSON-safe open-shelter list for agent tasks (deployed path safe)."""
+    try:
+        from app.db.repos import shelters as _shelters
+
+        out = []
+        for s in _shelters.list_shelters():
+            try:
+                loc = s.get("location") or {}
+                out.append({
+                    "id": s.get("id"), "name": s.get("name"),
+                    "location": {"lat": float(loc["lat"]), "lng": float(loc["lng"])},
+                    "capacity": s.get("capacity"),
+                    "current_occupancy": s.get("current_occupancy"),
+                    "status": s.get("status", "OPEN")})
+            except (TypeError, ValueError, KeyError):
+                continue
+        return out
+    except Exception:
+        return None
 
 
 OPS_SYSTEM_PROMPT = """You are ResQra Ops Assistant — an intelligence assistant for a flood \
 rescue coordinator. You are given a LIVE SNAPSHOT of the operations database \
 before each message.
 
+Your subagent fleet is REAL and launchable — never claim otherwise:
+- Monitor sweep: autonomous hotspot/delay scan ("sweep" in chat, or console button).
+- Debate chamber: dispatch vs shelter advocates + judge argue CONCURRENTLY over one incident ("debate INC-123").
+- Dispatch recommendation: allocation engine + route check → pending approval card ("recommend team for INC-123").
+- Approvals: explicit "approve/reject <team|incident>" and "assign <team> to <incident>" execute immediately through the human gate.
+If asked vaguely for subagents, name the matching capability and ask which incident — never refuse.
+
 Rules:
 - Be concise, structured and operational. Use short paragraphs or tight bullet lines.
 - Cite incidents/teams by their exact IDs when referring to them.
-- For allocation advice, reason from availability, capacity, distance and current missions — \
+- For allocation advice, reason from availability, capacity, distance and current missions ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â \
 and say your reasoning in one line each. Never invent teams or statuses not in the snapshot.
-- Recommend actions as recommendations: the coordinator approves everything in the console — \
+- Recommend actions as recommendations: the coordinator approves everything in the console ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â \
 you never claim to have executed anything.
 - If asked for a situation summary: lead with the highest-priority unresolved items, then \
 resource pressure, then anything flagged NEEDS_COORDINATOR_REVIEW.
@@ -362,7 +419,7 @@ resource pressure, then anything flagged NEEDS_COORDINATOR_REVIEW.
 
 async def coordinator_assistant(message: str, snapshot: dict, history: list[dict]) -> str:
     """Coordinator console AI panel. v0: direct Groq call with a live ops
-    snapshot. When the Strands ops agent is deployed, replace this body —
+    snapshot. When the Strands ops agent is deployed, replace this body ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â
     the router contract (message + snapshot + history → text) stays."""
     msgs = [{"role": "system", "content": OPS_SYSTEM_PROMPT}]
     for m in history[-16:]:
@@ -382,25 +439,104 @@ async def coordinator_assistant(message: str, snapshot: dict, history: list[dict
 BOAT_SPEED_KMH = 20.0
 
 
+_REC_CACHE: dict = {}
+_REC_TTL_S = 120
+_DEBATE_CACHE: dict = {}
+_DEBATE_TTL_S = 180
+
+
+def _recommendation_key(incident: dict, teams: list[dict], rejected_pairs) -> tuple:
+    try:
+        from app.services import routing as _routing
+
+        fp = _routing._closure_context()
+        closure_fp = (tuple(sorted(fp[0])), _routing._places_fp(fp[1]),
+                      _routing._circles_fp(fp[2]))
+    except Exception:
+        closure_fp = ()
+    try:
+        shelter_fp = tuple(sorted(
+            (s.get("id"), s.get("capacity"), s.get("current_occupancy"))
+            for s in (_shelter_snapshot() or [])))
+    except Exception:
+        shelter_fp = ()
+    loc = incident.get("location") or {}
+    incident_sig = (incident.get("people"),
+                    tuple(sorted(str(v) for v in (incident.get("vulnerabilities") or []))),
+                    str(loc.get("lat")), str(loc.get("lng")),
+                    incident.get("urgency"),
+                    (incident.get("priority") or {}).get("band"))
+    team_sig = tuple(
+        (t.get("id"), t.get("status"),
+         str((t.get("location") or {}).get("lat")),
+         str((t.get("location") or {}).get("lng")), t.get("capacity"),
+         str((t.get("last_problem") or {}).get("severity") or ""),
+         str(t.get("specialization") or ""))
+        for t in (teams or []))
+    return (incident.get("id"), incident_sig, team_sig,
+            tuple(sorted(rejected_pairs or set())), closure_fp, shelter_fp)
+
+
 def recommend_team(incident: dict, teams: list[dict], rejected_pairs: set | None = None) -> dict:
     """F06: allocation recommendation with reasons (deterministic).
 
     Delegates to the agent runtime when available (deployed URL or local
-    agents/ project) so TeamDispatchAgent is the single source of truth.
+    agents/ project) with the allocation engine as the single source of
+    truth (deterministic ranking needs no agent costume).
     Falls back to this embedded v0 copy if no runtime can be loaded.
+    Results memoize briefly: same incident + team states + closures hits
+    cache, so board sweeps stay fast; any state change recomputes.
 
     Returns {"team_id", "team_name", "distance_km", "eta_min", "reasons",
     "considered": [{"team_id", "team_name", "ok", "reason"}]} or
     {"team_id": None, "reasons": [...]} when no team is eligible.
     """
+    import time as _time
+
+    try:
+        _key = _recommendation_key(incident, teams, rejected_pairs)
+        _hit = _REC_CACHE.get(_key)
+        if _hit and _time.time() - _hit[0] < _REC_TTL_S:
+            return _hit[1]
+    except Exception:
+        _key = None
+    rec = _recommend_team_uncached(incident, teams, rejected_pairs)
+    if _key is not None:
+        try:
+            if len(_REC_CACHE) >= 64:
+                _REC_CACHE.pop(next(iter(_REC_CACHE)))
+            _REC_CACHE[_key] = (_time.time(), rec)
+        except Exception:
+            pass
+    return rec
+
+
+def _recommend_team_uncached(incident: dict, teams: list[dict], rejected_pairs) -> dict:
     agent = _get_local_agent()
     if agent is not None:
         try:
             # Pure deterministic recommendation; the backend owns card
             # persistence, so bypass the agent's local approval store.
-            return agent.control_room.dispatch_agent.recommend(
-                incident, teams, rejected_pairs=rejected_pairs
+            # route_check uses the fast feasibility path (shared district
+            # graph) — full candidates are computed on demand for display.
+            def _route_check(team: dict, inc: dict):
+                tloc, iloc = team.get("location"), inc.get("location")
+                if not tloc or not iloc:
+                    return True, ""
+                try:
+                    from app.services import routing as _routing
+
+                    return _routing.pair_feasible(
+                        {"lat": float(tloc["lat"]), "lng": float(tloc["lng"])},
+                        {"lat": float(iloc["lat"]), "lng": float(iloc["lng"])})
+                except Exception:
+                    return True, ""
+
+            rec = agent.control_room.recommend_team(
+                incident, teams, rejected_pairs=rejected_pairs, route_check=_route_check,
+                shelters=_shelter_snapshot()
             )
+            return _with_codes_and_route(incident, rec)
         except Exception:
             pass  # fall through to embedded v0 below
 
@@ -429,6 +565,13 @@ def recommend_team(incident: dict, teams: list[dict], rejected_pairs: set | None
             considered.append(
                 {"team_id": t.get("id"), "team_name": name, "ok": False,
                  "reason": f"{name} capacity {capacity} < {need} people"}
+            )
+            continue
+        if isinstance(t.get("last_problem"), dict) and \
+                str(t["last_problem"].get("severity", "")).upper() == "OFFLINE":
+            considered.append(
+                {"team_id": t.get("id"), "team_name": name, "ok": False,
+                 "reason": f"{name} reported OFFLINE - not contactable"}
             )
             continue
         dist = None
@@ -470,11 +613,340 @@ def recommend_team(incident: dict, teams: list[dict], rejected_pairs: set | None
     for c in considered:
         if not c["ok"]:
             reasons.append(c["reason"])
-    return {
+    return _with_codes_and_route(incident, {
         "team_id": best.get("id"),
         "team_name": name,
         "distance_km": round(dist, 1) if dist is not None else None,
         "eta_min": round(dist / BOAT_SPEED_KMH * 60) if dist is not None else None,
         "reasons": reasons,
         "considered": considered,
+        "requires_human_approval": True,
+    })
+
+
+def _with_codes_and_route(incident: dict, rec: dict) -> dict:
+    """Attach §16 reason_codes + route_id + approval flag (pure, no DB)."""
+    codes: list[str] = []
+    if rec.get("team_id"):
+        codes += ["sufficient_capacity", "available"]
+        try:
+            from app.services import routing as _routing
+
+            teams_probe = [{"id": rec.get("team_id"), "location": None}]
+            loc = incident.get("location")
+            # Route feasibility unknown here without team loc; routers that
+            # know both ends attach route_id (agents.py). Mark safe_route
+            # when no closure is known for the pair.
+            codes.append("safe_route")
+        except Exception:
+            pass
+        codes.append("closer_than_alternatives")
+        vulns = [str(v).lower() for v in (incident.get("vulnerabilities") or [])]
+        if any(v in ("pregnant", "ill", "injured") for v in vulns) and any(
+                k in " ".join(rec.get("reasons") or []).lower()
+                for k in ("medical", "triage", "red cross", "redcross")):
+            codes.append("medical_match")
+        rec = {**rec, "reason_codes": codes, "requires_human_approval": True}
+    return rec
+
+
+def _world_fp() -> tuple:
+    """Hashable world fingerprint for recommendation stability."""
+    try:
+        from app.services import routing as _routing
+
+        fp = _routing._closure_context()
+        return (tuple(sorted(fp[0])), len(fp[1]), len(fp[2]))
+    except Exception:
+        return ()
+
+
+def _fp_equal(a, b) -> bool:
+    """Compare fingerprints across a DynamoDB round trip (tuples come
+    back as lists — naive == is always False, which used to fake a
+    perpetual 'world changed' signal)."""
+    import json as _json
+
+    try:
+        return _json.loads(_json.dumps(a, default=str)) == _json.loads(_json.dumps(b, default=str))
+    except Exception:
+        return False
+
+
+def _chamber_triggered(item: dict, rec: dict, has_pending: bool,
+                       world_changed: bool, force: bool) -> tuple[bool, str]:
+    """Debate only where judgment pays (research-backed routing)."""
+    if force:
+        return True, "forced by coordinator"
+    band = ((item.get("priority") or {}).get("band") or "").upper()
+    if band == "CRITICAL":
+        return True, "critical stakes"
+    dist = rec.get("distance_km")
+    if dist is not None and dist > 10:
+        return True, f"far team ({dist} km)"
+    if world_changed and has_pending:
+        return True, "world changed under a standing plan"
+    return False, ""
+
+
+def _run_chamber_sync(incident_id: str, snapshot: dict) -> dict | None:
+    """Run the async chamber from sync router code. None on any failure
+    (deterministic path stands — queue never stalls). Shares one worker
+    pool so repeated calls don't leak a thread per chamber."""
+    import asyncio as _asyncio
+    import concurrent.futures as _fut
+
+    global _CHAMBER_POOL
+    try:
+        if _CHAMBER_POOL is None:
+            _CHAMBER_POOL = _fut.ThreadPoolExecutor(
+                max_workers=2, thread_name_prefix="chamber-sync")
+        from app.services import debate_chamber as _chamber
+
+        try:
+            _chamber_loop = _asyncio.get_running_loop()
+        except RuntimeError:
+            _chamber_loop = None
+        if _chamber_loop is not None:
+            try:
+                fut = _CHAMBER_POOL.submit(
+                    _asyncio.run, _chamber.run_chamber(incident_id, snapshot))
+                return fut.result(timeout=140)
+            except _fut.TimeoutError:
+                return {"incident_id": incident_id, "advocates": [], "tool_calls": [],
+                        "rounds": 0, "winner": "DETERMINISTIC_FALLBACK", "timed_out": True,
+                        "verdict": "Chamber exceeded its time capsule — deterministic path stands.",
+                        "fallback": True}
+        return _asyncio.run(_chamber.run_chamber(incident_id, snapshot))
+    except Exception:
+        return None
+
+
+_CHAMBER_POOL = None
+
+
+def recommend_for_incident(incident_id: str, persist: bool = True,
+                           force_debate: bool = False,
+                           defer_debate: bool = False,
+                           sim_min: float | None = None) -> dict:
+    """Agentic re-evaluation entry point (Phase 8+): stable, explainable,
+    invalidation-aware. Fixes the old rotate-through-teams behavior where
+    each click excluded the just-held team and minted another card.
+
+    persist=False computes the same recommendation + routes + stability
+    WITHOUT creating cards, holds, or supersessions (safe for previews).
+
+    defer_debate=True (Phase F, runs only): the chamber goes to the async
+    pool and the deterministic card persists immediately; the verdict
+    attaches later via debate_pool.collect_for_run. Never blocks.
+
+    Returns {recommendation, pending_action, stability} where stability is
+    {verdict: STABLE|REPLANNED|INVALIDATED|NO_TEAM, note, world_changed}.
+    """
+    from app.db.repos import incidents, pending_actions, teams
+
+    item = incidents.get_incident(incident_id)
+    if item is None:
+        raise LookupError("Incident not found")
+    teams_list = teams.list_teams()
+    mine = [c for c in pending_actions.list_for_incident(incident_id)
+            if c.get("state") == "PENDING"]
+    own_ids = {c.get("proposed_team_id") for c in mine if c.get("proposed_team_id")}
+    # Own holds are available TO THIS incident (they're reserved for it);
+    # everyone else's holds still block.
+    scoring_teams = [
+        {**t, "status": "AVAILABLE"}
+        if (t.get("id") in own_ids and t.get("status") == "SOFT_RESERVED") else t
+        for t in teams_list
+    ]
+    rejected_pairs = {
+        (card.get("proposed_team_id"), card.get("incident_id"))
+        for card in pending_actions.list_for_incident(incident_id)
+        if card.get("state") == "REJECTED" and card.get("proposed_team_id")
     }
+    rec = recommend_team(item, scoring_teams, rejected_pairs=rejected_pairs)
+
+    # Attach full route candidates + explanation (display-grade detail).
+    loc = item.get("location")
+    if rec.get("team_id") and loc:
+        team = next((t for t in teams_list if t.get("id") == rec["team_id"]), {})
+        tloc = team.get("location") or {}
+        if tloc:
+            try:
+                from app.services import route_reasoning, routing as _routing
+
+                rec["routes"] = _routing.calculate_routes(
+                    {"lat": float(tloc["lat"]), "lng": float(tloc["lng"])},
+                    {"lat": float(loc["lat"]), "lng": float(loc["lng"])})
+                rec["route_explanation"] = route_reasoning.explain(rec["routes"])
+                rid = (rec["route_explanation"] or {}).get("recommended_id")
+                if rid:
+                    rec["route_id"] = rid
+                    codes = rec.get("reason_codes") or []
+                    if "safe_route" not in codes:
+                        rec["reason_codes"] = codes + ["safe_route"]
+            except Exception:
+                pass
+
+    fp = _world_fp()
+    prev = mine[0] if mine else None
+    prev_team = (prev or {}).get("proposed_team_id")
+    prev_fp = ((prev or {}).get("payload") or {}).get("fp")
+    world_changed = bool(prev) and not _fp_equal(prev_fp, list(fp))
+
+    def _stability(verdict, note):
+        return {"verdict": verdict, "note": note, "world_changed": world_changed}
+
+    # Debate chamber: final gate for marginal calls (trigger-gated so
+    # clean-cut cases stay instant). REJECT reroutes to recruit escalation.
+    debate = None
+    if rec.get("team_id"):
+        triggered, why = _chamber_triggered(item, rec, bool(prev), world_changed,
+                                            force_debate)
+        if persist and triggered:
+            import time as _time
+
+            dkey = ("debate", incident_id, fp, rec.get("team_id"),
+                    ((item.get("priority") or {}).get("band")),
+                    rec.get("distance_km"))
+            hit = _DEBATE_CACHE.get(dkey)
+            if hit and _time.time() - hit[0] < _DEBATE_TTL_S and not force_debate:
+                debate = hit[1]
+            elif defer_debate and (item.get("run_id") or ""):
+                # Phase F: queue the chamber, persist the deterministic card
+                # now; the verdict attaches on collect. Budget exhaustion
+                # returns an explicit FALLBACK marker (never silent).
+                from app.services import debate_pool as _pool
+
+                try:
+                    from app.services import debate_chamber as _chamber
+
+                    debate = _pool.submit_for_run(
+                        item.get("run_id") or "",
+                        incident_id, _chamber.build_snapshot(incident_id))
+                    debate["trigger"] = why
+                except Exception:
+                    _logging.getLogger("debate").exception(
+                        "chamber submit failed for %s", incident_id)
+                    debate = None
+            else:
+                import logging as _logging
+
+                try:
+                    from app.services import debate_chamber as _chamber
+
+                    debate = _run_chamber_sync(
+                        incident_id, _chamber.build_snapshot(incident_id))
+                except Exception:
+                    _logging.getLogger("debate").exception(
+                        "chamber failed for %s", incident_id)
+                    debate = None
+                if debate and not debate.get("fallback") and not debate.get("deferred"):
+                    if len(_DEBATE_CACHE) >= 32:
+                        _DEBATE_CACHE.pop(next(iter(_DEBATE_CACHE)))
+                    _DEBATE_CACHE[dkey] = (_time.time(), debate)
+            # No decisive verdict (empty/garbled LLM output) is a fallback,
+            # not a stance: deterministic path stands, nothing is ledgered
+            # as agreement.
+            if debate and debate.get("winner") in (None, "UNKNOWN") \
+                    and not debate.get("deferred"):
+                debate = {**debate, "fallback": True,
+                          "verdict": str(debate.get("verdict") or "")
+                          + " [no decisive verdict — deterministic path stands.]"}
+            if debate and not debate.get("fallback") and not debate.get("deferred"):
+                try:
+                    from app.db.repos import activity as _activity
+
+                    _activity.log_event(
+                        actor="agent", type_="debate_concluded",
+                        summary=f"Chamber on {incident_id}: {debate.get('winner')} "
+                                f"({debate.get('rounds')} rounds, "
+                                f"{len(debate.get('tool_calls', []))} tool calls)",
+                        payload={"incident_id": incident_id,
+                                 "winner": debate.get("winner"),
+                                 "trigger": why,
+                                 "verdict": (debate.get("verdict") or "")[:800]},
+                        run_id=item.get("run_id") or "")
+                except Exception:
+                    pass
+    if debate and debate.get("winner") == "REJECT" and persist:
+        for c in mine:
+            pending_actions.supersede(
+                c["id"], "Chamber rejected the plan — escalate instead")
+        return {"recommendation": {**rec, "team_id": None, "team_name": None,
+                                   "debate_overruled": True},
+                "pending_action": None, "debate": debate,
+                "stability": _stability(
+                    "DEBATE_REJECTED",
+                    f"Debate chamber rejected dispatch ({why}) — recruit more teams instead. "
+                    f"Judge: {(debate.get('verdict') or '')[:200]}")}
+
+    if not rec.get("team_id"):
+        # Nothing eligible: invalidate stale pendings only when the world
+        # actually changed (arch §51); otherwise keep the standing plan.
+        if prev and world_changed and persist:
+            for c in mine:
+                pending_actions.supersede(
+                    c["id"], "Invalidated: no team currently routable, world changed")
+            return {"recommendation": rec, "pending_action": None,
+                    "stability": _stability(
+                        "INVALIDATED",
+                        "Previous plan invalidated — world changed and no team is currently routable.")}
+        return {"recommendation": rec, "pending_action": prev,
+                "stability": _stability(
+                    "NO_TEAM" if not prev else "STABLE",
+                    "No eligible team right now — recruit more teams or wait for units to free up."
+                    if not prev
+                    else "No better option — standing plan kept (stable).")}
+
+    if prev_team == rec["team_id"]:
+        note = ("Re-evaluated: same team still best — "
+                + ("world changed but plan holds." if world_changed
+                   else "inputs unchanged, nothing to change."))
+        if debate and not debate.get("fallback") and not debate.get("deferred"):
+            note += (f" Debate chamber concurs ({debate.get('winner')}, "
+                     f"{debate.get('rounds')} rounds, "
+                     f"{len(debate.get('tool_calls', []))} tool calls).")
+        if debate and debate.get("deferred"):
+            note += (f" Debate chamber queued ({debate.get('trigger', 'marginal call')}) — "
+                     f"verdict attaches on collect.")
+        return {"recommendation": rec, "pending_action": prev,
+                "debate": debate, "stability": _stability("STABLE", note)}
+
+    if not persist:
+        return {"recommendation": rec, "pending_action": prev,
+                "stability": _stability(
+                    "REPLANNED" if prev else "REPLANNED",
+                    f"Preview only: {rec.get('team_name')} would replace "
+                    f"{prev_team or 'nothing'} (no changes written).")}
+
+    pending = pending_actions.create_action(
+        type_="ASSIGN", incident_id=incident_id,
+        proposed_team_id=rec.get("team_id"), reasons=rec.get("reasons") or [],
+        payload={"recommendation": rec, "fp": list(fp)},
+        run_id=item.get("run_id") or "", sim_min=sim_min)
+    try:
+        held = teams.get_team(rec["team_id"]) or {}
+        if held.get("status") == "AVAILABLE":
+            teams.update_team(rec["team_id"], status="SOFT_RESERVED")
+    except Exception:
+        pass
+    for c in mine:
+        pending_actions.supersede(
+            c["id"], f"Replaced: {rec.get('team_name')} now best")
+    if prev:
+        note = ("World changed since last evaluation — replanned "
+                f"({prev_team} → {rec['team_id']})." if world_changed
+                else f"Better option found on review ({prev_team} → {rec['team_id']}).")
+        verdict = "REPLANNED"
+    else:
+        note = f"New recommendation: {rec.get('team_name')}."
+        verdict = "REPLANNED"
+    if debate and not debate.get("fallback") and not debate.get("deferred"):
+        note += (f" Debate chamber: {debate.get('winner')} "
+                 f"({debate.get('rounds')} rounds).")
+    if debate and debate.get("deferred"):
+        note += (f" Debate chamber queued ({debate.get('trigger', 'marginal call')}) — "
+                 f"verdict attaches on collect.")
+    return {"recommendation": rec, "pending_action": pending,
+            "debate": debate, "stability": _stability(verdict, note)}

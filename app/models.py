@@ -61,11 +61,14 @@ class IncidentCreate(BaseModel):
     water_rising: bool | None = None
     location: LocationIn | None = None  # set later by IntakeAgent geocoding
     location_text: str | None = None
+    run_id: str = Field(default="", max_length=64)  # Phase A: simulation-run provenance
 
 
 class StatusUpdate(BaseModel):
     status: Literal[
-        "NEW", "VERIFIED", "PRIORITIZED", "ASSIGNED", "IN_PROGRESS", "RESCUED", "RESOLVED"
+        "NEW", "UNVERIFIED", "VERIFIED", "PRIORITIZED", "AWAITING_ASSIGNMENT",
+        "ASSIGNED", "IN_PROGRESS", "RESCUED", "RESOLVED",
+        "DUPLICATE", "ESCALATED", "REOPENED",
     ]
 
 
@@ -82,15 +85,16 @@ class ApprovalDecision(BaseModel):
 class TeamCreate(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     capacity: int = Field(ge=1, le=500)
-    status: Literal["AVAILABLE", "ON_MISSION", "RETURNING", "OFFLINE"] = "AVAILABLE"
+    status: Literal["AVAILABLE", "ON_MISSION", "RETURNING", "OFFLINE", "UNAVAILABLE"] = "AVAILABLE"
     location: LocationIn | None = None
     contact: str = Field(default="", max_length=80)
     specialization: str = Field(default="", max_length=120)
     notes: str = Field(default="", max_length=500)
+    district: str = Field(default="rautahat", max_length=40)
 
 
 class TeamStatusUpdate(BaseModel):
-    status: Literal["AVAILABLE", "ON_MISSION", "RETURNING", "OFFLINE"]
+    status: Literal["AVAILABLE", "SOFT_RESERVED", "ON_MISSION", "RETURNING", "UNAVAILABLE", "OFFLINE"]
 
 
 class TeamLocationUpdate(BaseModel):

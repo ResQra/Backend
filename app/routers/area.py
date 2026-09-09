@@ -82,3 +82,57 @@ def area_config(area: str = Query("rautahat")):
         "zoom": 12,
         "bounds": {"sw": [26.65, 85.18], "ne": [27.15, 85.42]},
     })
+
+
+@router.get("/roads")
+def area_roads(sw_lat: float = 0, sw_lng: float = 0, ne_lat: float = 0, ne_lng: float = 0):
+    """Road + bridge geometry for a bbox with live closure markers.
+
+    Merges Overpass geometry (services.road_data, cached 30 min) with
+    blockade events from the world state so closed corridors render.
+    Always returns blocked_events even when Overpass is unreachable.
+    """
+    from app.db.repos import simulation_events
+    from app.services import road_data
+
+    blocked = []
+    for kind in ("ROAD_BLOCKED", "BRIDGE_BLOCKED"):
+        try:
+            for ev in simulation_events.list_by_type(kind, limit=20):
+                payload = ev.get("payload") or {}
+                if payload.get("lat") is None or payload.get("lng") is None:
+                    continue
+                blocked.append({
+                    "lat": float(payload["lat"]),
+                    "lng": float(payload["lng"]),
+                    "kind": kind,
+                    "level": payload.get("level", "BLOCKED"),
+                })
+        except Exception:
+            continue
+
+    if not all([sw_lat, sw_lng, ne_lat, ne_lng]):
+        return {"roads": [], "bridges": [], "blocked_events": blocked}
+    # Local disk graph first (instant); live Overpass only as fallback.
+    local = road_data.get_local_roads(sw_lat, sw_lng, ne_lat, ne_lng)
+    if local.get("roads"):
+        local["blocked_events"] = blocked
+        return _capped(local)
+    try:
+        data = road_data.get_roads(sw_lat, sw_lng, ne_lat, ne_lng)
+    except Exception:
+        data = {"roads": [], "bridges": [], "error": "overpass_unavailable"}
+    return _capped({**data, "blocked_events": blocked})
+
+
+def _capped(data: dict) -> dict:
+    """Cap render load: major corridors first. Full graph stays
+    available to the routing engine server-side."""
+    priority = {"motorway": 0, "trunk": 1, "primary": 2, "secondary": 3,
+                "tertiary": 4, "unclassified": 5, "residential": 6}
+    roads = sorted(data.get("roads", []),
+                   key=lambda r: priority.get(str(r.get("type", "")).lower(), 9))[:1200]
+    data["roads"] = roads
+    data["bridges"] = data.get("bridges", [])[:400]
+    data["truncated"] = True
+    return data

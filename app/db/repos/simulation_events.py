@@ -18,7 +18,16 @@ def put_event(idempotency_key: str, event_type: str, payload: dict) -> dict:
         "created_at": int(time.time() * 1000),
         "source_priority": payload.get("source_priority", "SIMULATION"),
     }
-    table(TABLE).put_item(Item=item)
+    try:
+        table(TABLE).put_item(
+            Item=item,
+            ConditionExpression="attribute_not_exists(idempotency_key)",
+        )
+    except Exception as exc:
+        # Lost the race: a concurrent writer won. Return the winner.
+        if "ConditionalCheckFailed" in str(exc):
+            return get_event(idempotency_key) or item
+        raise
     return item
 
 

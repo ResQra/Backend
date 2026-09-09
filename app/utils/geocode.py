@@ -18,8 +18,8 @@ _MIN_INTERVAL = 1.1
 _lock = asyncio.Lock()
 _last_call = 0.0
 
-# demo-region bias (Bihar) for Photon ranking
-_BIAS_LAT, _BIAS_LNG = 25.9, 85.4
+# Rautahat (Nepal) bias for Photon ranking — operations district.
+_BIAS_LAT, _BIAS_LNG = 26.7640, 85.2780
 
 
 def _norm(word: str) -> str:
@@ -36,7 +36,8 @@ def _norm(word: str) -> str:
 
 
 # generic words that must not drive matching (they match everything)
-_GENERIC = {"main", "chowk", "road", "near", "bihar", "india", "village", "block",
+_GENERIC = {"main", "chowk", "road", "near", "bihar", "india", "nepal",
+            "rautahat", "madhesh", "village", "block",
             "the", "and", "at", "in", "school", "market", "gaon", "bus", "stand",
             "thana", "station", "chauraha", "mode", "mandi"}
 
@@ -73,7 +74,7 @@ async def _nominatim(query: str) -> dict | None:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 resp = await client.get(
                     "https://nominatim.openstreetmap.org/search",
-                    params={"q": query, "format": "json", "limit": 1, "countrycodes": "in"},
+                    params={"q": query, "format": "json", "limit": 1, "countrycodes": "np"},
                     headers=_HEADERS,
                 )
                 data = resp.json()
@@ -116,16 +117,16 @@ async def _photon(query: str) -> dict | None:
         score += 3 * len(q_tokens & name_tokens)
         if head and (head in name_tokens or head == joined or (joined and joined in head)):
             score += 6  # the leading word is the place name — match it strongly
-        if p.get("state") == "Bihar":
-            score += 1
-        if p.get("country") == "India":
+        if p.get("country") == "Nepal":
+            score += 2
+        if "madhesh" in str(p.get("state") or "").lower():
             score += 1
         if score > best_score:
             best_score = score
             best = f
 
     if not best or best_score < 9:
-        # 9 = head-token match (6) + Bihar (1) + India (1) + one more token (3)?
+        # 9 = head-token match (6) + Nepal (2) + one more token (3)?
         # threshold below requires the leading place-name token to match —
         # without it we'd plot a wrong landmark (F02: never guess).
         return None
@@ -142,14 +143,16 @@ async def _photon(query: str) -> dict | None:
 async def geocode(query: str) -> dict | None:
     """Query → {"lat", "lng", "label", "confidence"} or None.
 
-    Bihar-biased (demo region) but not restricted: any Indian result can
-    match. Failures return None — callers flag, never crash the flow.
+    Rautahat/Nepal-biased (operations district) but not restricted: any
+    Nepali result can match. Failures return None — callers flag, never
+    crash the flow.
     """
     q = (query or "").strip()
     if not q:
         return None
-    if "india" not in q.lower() and "bihar" not in q.lower() and "patna" not in q.lower():
-        q = f"{q}, Bihar, India"
+    low = q.lower()
+    if not any(k in low for k in ("nepal", "rautahat", "madhesh", "bihar", "india", "patna")):
+        q = f"{q}, Rautahat, Nepal"
 
     result = await _nominatim(q)
     if result:

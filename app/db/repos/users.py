@@ -98,13 +98,20 @@ def update_user_info(user_id: str, **fields) -> dict | None:
         return get_user(user_id)
     updates["updated_at"] = int(time.time() * 1000)
     expr = "SET " + ", ".join(f"#{k} = :{k}" for k in updates)
-    resp = table(TABLE).update_item(
-        Key={"id": user_id},
-        UpdateExpression=expr,
-        ExpressionAttributeNames={f"#{k}": k for k in updates},
-        ExpressionAttributeValues={f":{k}": v for k, v in updates.items()},
-        ReturnValues="ALL_NEW",
-    )
+    try:
+        resp = table(TABLE).update_item(
+            Key={"id": user_id},
+            UpdateExpression=expr,
+            ConditionExpression="attribute_exists(id)",
+            ExpressionAttributeNames={f"#{k}": k for k in updates},
+            ExpressionAttributeValues={f":{k}": v for k, v in updates.items()},
+            ReturnValues="ALL_NEW",
+        )
+    except Exception as exc:
+        # Missing user -> None (callers map to 404); never ghost-create.
+        if "ConditionalCheckFailed" in str(exc):
+            return None
+        raise
     return resp.get("Attributes")
 
 

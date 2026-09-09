@@ -201,4 +201,71 @@ TABLES: dict[str, dict] = {
             },
         ],
     },
+    # --- Phase B: autonomous run records (one row per 48h run) ---
+    "SimulationRuns": {
+        "KeySchema": [{"AttributeName": "id", "KeyType": "HASH"}],
+        "AttributeDefinitions": [{"AttributeName": "id", "AttributeType": "S"}],
+    },
+    # --- Phase 1: §34.1 coverage (created by scripts/create_tables.py) ---
+    "Roads": {
+        "KeySchema": [{"AttributeName": "id", "KeyType": "HASH"}],
+        "AttributeDefinitions": [{"AttributeName": "id", "AttributeType": "S"}],
+    },
+    "Bridges": {
+        "KeySchema": [{"AttributeName": "id", "KeyType": "HASH"}],
+        "AttributeDefinitions": [{"AttributeName": "id", "AttributeType": "S"}],
+    },
+    "HazardZones": {
+        "KeySchema": [{"AttributeName": "id", "KeyType": "HASH"}],
+        "AttributeDefinitions": [{"AttributeName": "id", "AttributeType": "S"}],
+    },
+    "WaterObservations": {
+        "KeySchema": [{"AttributeName": "id", "KeyType": "HASH"}],
+        "AttributeDefinitions": [{"AttributeName": "id", "AttributeType": "S"}],
+    },
+    "WeatherObservations": {
+        "KeySchema": [{"AttributeName": "id", "KeyType": "HASH"}],
+        "AttributeDefinitions": [{"AttributeName": "id", "AttributeType": "S"}],
+    },
+    "OperationalEvents": {
+        "KeySchema": [{"AttributeName": "id", "KeyType": "HASH"}],
+        "AttributeDefinitions": [{"AttributeName": "id", "AttributeType": "S"}],
+    },
+    "AgentRecommendations": {
+        "KeySchema": [{"AttributeName": "id", "KeyType": "HASH"}],
+        "AttributeDefinitions": [{"AttributeName": "id", "AttributeType": "S"}],
+    },
+    "HumanDecisions": {
+        "KeySchema": [{"AttributeName": "id", "KeyType": "HASH"}],
+        "AttributeDefinitions": [{"AttributeName": "id", "AttributeType": "S"}],
+    },
+    # --- Phase: coordinator multi-session chat (ChatHistory key untouched) ---
+    "CoordinatorSessions": {
+        "KeySchema": [{"AttributeName": "session_id", "KeyType": "HASH"}],
+        "AttributeDefinitions": [
+            {"AttributeName": "session_id", "AttributeType": "S"},
+            {"AttributeName": "coordinator_id", "AttributeType": "S"},
+            {"AttributeName": "updated_at", "AttributeType": "N"},
+        ],
+        "GlobalSecondaryIndexes": [
+            {
+                "IndexName": "coordinator-updated-index",
+                "KeySchema": [
+                    {"AttributeName": "coordinator_id", "KeyType": "HASH"},
+                    {"AttributeName": "updated_at", "KeyType": "RANGE"},
+                ],
+                "Projection": {"ProjectionType": "ALL"},
+            },
+        ],
+    },
+    "CoordinatorChat": {
+        "KeySchema": [
+            {"AttributeName": "session_id", "KeyType": "HASH"},
+            {"AttributeName": "ts", "KeyType": "RANGE"},
+        ],
+        "AttributeDefinitions": [
+            {"AttributeName": "session_id", "AttributeType": "S"},
+            {"AttributeName": "ts", "AttributeType": "N"},
+        ],
+    },
 }

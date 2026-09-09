@@ -30,7 +30,7 @@ from app.models import (
     TeamProblemReport,
     TeamStatusUpdate,
 )
-from app.services.broadcast import manager as broadcast
+from app.services import realtime
 
 router = APIRouter(
     prefix="/api/ops",
@@ -159,30 +159,147 @@ def action_board():
 
 
 @router.post("/assistant")
-async def assistant(body: dict):
-    """Coordinator AI panel: message in → agent reply out. The ops snapshot
-    (queue + teams + flags) is attached server-side so the client can never
-    tamper with it. Seam: gateway.coordinator_assistant (Strands slot)."""
+async def assistant(body: dict, user: CurrentUser = Depends(require_role("coordinator"))):
+    """Phase 6 supervisor: area-aware grounded answer. Snapshot built
+    server-side so the client can never tamper with it. With session_id,
+    history persists server-side and both turns are stored."""
+    from app.agents_gateway import supervisor as supervisor_mod
+    from app.db.repos import coordinator_chat as csessions
+
     message = str(body.get("message", "")).strip()
     if not message:
         raise HTTPException(status_code=422, detail="message required")
-    snapshot = {
-        "open_incidents": incidents.list_open_incidents(),
-        "teams": teams.list_teams(),
-        "unresolved_locations": [
-            {"id": r.get("id"), "name": r.get("name"), "stated": r.get("location_text")}
-            for r in users.list_residents_with_location()
-            if r.get("location_text") and not r.get("location")
-        ],
-    }
-    history = body.get("history") or []
-    try:
-        reply = await gateway.coordinator_assistant(message, snapshot, history)
-    except llm.LLMNotConfiguredError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
-    except gateway.AgentNotConnectedError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
-    return {"reply": reply}
+    area_context = body.get("area_context") or {
+        "area": body.get("area"), "bounds": body.get("bounds"),
+        "incident_id": body.get("incident_id")}
+    session_id = body.get("session_id")
+    if session_id:
+        sess = csessions.get_session(session_id)
+        if sess is None or sess.get("coordinator_id") != user.id:
+            raise HTTPException(status_code=404, detail="Session not found")
+        history = [{"role": m.get("role"), "content": m.get("content")}
+                   for m in csessions.get_history(session_id, limit=16)]
+        csessions.append_message(session_id, "user", message)
+        if (sess.get("title") or "New conversation") == "New conversation":
+            existing = csessions.get_history(session_id, limit=5)
+            if len(existing) <= 1:
+                csessions.touch_session(session_id, title=message[:60])
+    else:
+        history = body.get("history") or []
+    # Explicit coordinator commands execute through the identical gate as
+    # the console buttons (same audit, same idempotency). Anything vague
+    # falls through to the supervisor for a proposal, never execution.
+    cmd = await _try_chat_command(message, user)
+    if cmd is not None:
+        reply, extra = cmd
+        out = {"reply": reply, **extra}
+        if session_id:
+            csessions.append_message(session_id, "agent", reply)
+            out = {**out, "session_id": session_id}
+        return out
+    out = await supervisor_mod.supervise(message, area_context, history)
+    if session_id:
+        csessions.append_message(session_id, "agent", out.get("reply", ""))
+        out = {**out, "session_id": session_id}
+    return out
+
+
+async def _try_chat_command(message: str, user: CurrentUser) -> tuple[str, dict] | None:
+    """Returns (reply, extra) when message is an explicit command, else None.
+
+    Subagent launches (debate/sweep/recommend) execute here too, so chat
+    can genuinely deploy the fleet — never claim otherwise.
+    """
+    from app.services import chat_commands
+
+    parsed = chat_commands.parse_command(
+        message,
+        pending_actions.list_pending(),
+        teams.list_teams(),
+        incidents.list_open_incidents())
+    action = parsed.get("action")
+    if action in ("approve", "reject"):
+        decision = "APPROVED" if action == "approve" else "REJECTED"
+        try:
+            res = _apply_decision(parsed["pending_id"], decision, None,
+                                  user.id, note=f"via chat: {message[:120]}",
+                                  via="chat")
+        except HTTPException as exc:
+            return f"Could not {action}: {exc.detail}.", {}
+        if res.get("deduped"):
+            return (f"Already decided — {parsed['pending_id']} was finalized earlier, "
+                    f"nothing executed twice.", {})
+        if action == "approve":
+            mission = (res.get("mission") or {}).get("id")
+            return (f"Approved and dispatched: {parsed['team_id']} to "
+                    f"{parsed['incident_id']} (mission {mission}).", {})
+        return (f"Rejected dispatch of {parsed['team_id']} for "
+                f"{parsed['incident_id']}. The team is available again.", {})
+    if action == "assign":
+        try:
+            _manual_assign(parsed["incident_id"], parsed["team_id"], via="chat")
+        except HTTPException as exc:
+            return f"Could not assign: {exc.detail}.", {}
+        return (f"Assigned {parsed['team_id']} to {parsed['incident_id']} "
+                f"(manual override via chat).", {})
+    if action == "clarify":
+        return parsed.get("reply", "Which one?"), {}
+    if action == "sweep":
+        out = trigger_agent_sweep()
+        n, h = out.get('incidents_scanned', 0), out.get('hotspots_identified', 0)
+        if h:
+            return (f"Sweep done — checked {n} incidents and found {h} hotspot cluster{'s' if h != 1 else ''} "
+                    f"worth a look. Details are in the activity feed.", {})
+        return (f"Sweep done — checked {n} incidents, nothing clustering. All quiet on the district scan.", {})
+    if action == "recommend":
+        try:
+            out = gateway.recommend_for_incident(parsed["incident_id"])
+        except LookupError:
+            raise HTTPException(status_code=404, detail="Incident not found")
+        rec = out.get("recommendation") or {}
+        pending = out.get("pending_action") or {}
+        if rec.get("team_id"):
+            return (f"For {parsed['incident_id']}, I'd send {rec.get('team_name')} "
+                    f"({rec.get('distance_km')} km out, there in ~{rec.get('eta_min')} min). "
+                    f"It's waiting as a pending card — approve it in the Decision Cockpit when ready.", {})
+        return (f"No team currently routable for {parsed['incident_id']} — "
+                f"escalation noted. Recruit more teams or wait for units to free up.", {})
+    if action == "debate":
+        import asyncio as _asyncio
+
+        from app.services import debate as debate_service
+
+        try:
+            out = await _asyncio.wait_for(
+                debate_service.run_debate(parsed["incident_id"]), timeout=150)
+        except LookupError:
+            raise HTTPException(status_code=404, detail="Incident not found")
+        except (_asyncio.TimeoutError, Exception) as exc:
+            return (f"The debate crew stalled on {parsed['incident_id']} ({type(exc).__name__}) — "
+                    f"the standing recommendation holds. Worth retrying from the Decision Cockpit.", {})
+        verdict = (out.get("verdict") or "").strip()
+        labels = {"dispatch_advocate": "Dispatch advocate",
+                  "shelter_advocate": "Shelter advocate",
+                  "dispatch_rebuttal": "Dispatch rebuttal",
+                  "shelter_rebuttal": "Shelter rebuttal",
+                  "judge": "Judge"}
+        stages = [{"role": t.get("role"), "label": labels.get(t.get("role"), t.get("role")),
+                   "content": (t.get("content") or "")[:500]}
+                  for t in out.get("transcript") or []]
+        # Plain-language verdict: lead with the call, then the why.
+        just = verdict
+        for prefix in ("JUSTIFICATION:", "WINNER: DISPATCH", "WINNER: WAIT"):
+            just = just.replace(prefix, "").strip(" \n-:")
+        iid = parsed["incident_id"]
+        if out.get("winner") == "DISPATCH":
+            reply = (f"Crew's done on {iid} — call: DISPATCH. {just} "
+                     f"Say the word and I'll queue it for approval.")
+        else:
+            reply = (f"Crew's done on {iid} — call: HOLD. {just} "
+                     f"The incident stays monitored; say 'recommend' anytime for a fresh look.")
+        return reply, {"stages": stages, "incident_id": iid,
+                       "winner": out.get("winner")}
+    return None
 
 
 @router.get("/map-data")
@@ -217,6 +334,7 @@ def create_team(body: TeamCreate):
         "contact": body.contact.strip(),
         "specialization": body.specialization.strip(),
         "notes": body.notes.strip(),
+        "district": (body.district or "rautahat").strip().lower(),
         "updated_at": int(time.time() * 1000),
     }
     if body.location:
@@ -238,38 +356,45 @@ def create_team(body: TeamCreate):
 @router.patch("/teams/{team_id}/status")
 def set_team_status(team_id: str, body: TeamStatusUpdate):
     """F05: registry status updates from the console (e.g. boat returning →
-    available, or marked offline for maintenance)."""
-    if teams.get_team(team_id) is None:
+    available, or marked offline for maintenance). Ranked write:
+    coordinator authority sticks until a higher source speaks."""
+    from app.services import world_sync
+
+    try:
+        out = world_sync.apply_team_status(team_id, body.status, source="COORDINATOR")
+    except LookupError:
         raise HTTPException(status_code=404, detail="Team not found")
-    item = teams.update_team(team_id, status=body.status)
+    item = out["team"]
     activity.log_event(
         actor="human",
         type_="team_status_changed",
         summary=f"{item.get('name', team_id)} → {body.status}",
         payload={"team_id": team_id, "status": body.status},
     )
-    broadcast.fire_and_forget("team_status", {"team": item})
     return item
 
 
 @router.patch("/teams/{team_id}/location")
 def set_team_location(team_id: str, body: TeamLocationUpdate):
-    if teams.get_team(team_id) is None:
-        raise HTTPException(status_code=404, detail="Team not found")
+    from app.services import world_sync
+
     location = {
         "lat": D(body.lat),
         "lng": D(body.lng),
         "label": body.label or f"{body.source} location",
         "updated_at": int(time.time() * 1000),
     }
-    item = teams.update_location(team_id, location, source=body.source)
+    try:
+        out = world_sync.apply_team_location(team_id, location, source=body.source)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Team not found")
+    item = out["team"]
     activity.log_event(
         actor="agent" if body.source == "SIMULATION" else "human",
         type_="team_location_updated",
         summary=f"{item.get('name', team_id)} location updated from {body.source}",
         payload={"team_id": team_id, "location": location, "source": body.source},
     )
-    broadcast.fire_and_forget("team_location", {"team": item})
     return item
 
 
@@ -287,7 +412,9 @@ def report_team_problem(team_id: str, body: TeamProblemReport):
         problem["location"] = {"lat": D(body.lat), "lng": D(body.lng)}
     update = {"last_problem": problem}
     if body.severity == "OFFLINE":
-        update["status"] = "OFFLINE"
+        from app.services import world_sync as _world_sync3
+
+        _world_sync3.apply_team_status(team_id, "OFFLINE", source="TEAM", force=True)
     item = teams.update_team(team_id, **update)
     activity.log_event(
         actor="agent",
@@ -326,48 +453,37 @@ def set_status(incident_id: str, body: StatusUpdate):
         summary=f"Incident {incident_id} → {body.status}",
         payload={"incident_id": incident_id, "status": body.status},
     )
-    broadcast.fire_and_forget("incident_status", {"incident": item})
+    realtime.publish("INCIDENT_UPDATED", {"incident": item})
     return item
 
 
 @router.post("/incidents/{incident_id}/recommend")
-def recommend(incident_id: str):
-    """F06 v0: allocation recommendation with reasons (deterministic).
-    Teams this coordinator already REJECTED for the incident are never
-    proposed again; the coordinator approves by calling the pending-action
-    decision endpoint — F07 stays human-gated."""
-    item = incidents.get_incident(incident_id)
-    if item is None:
+def recommend(incident_id: str, debate: bool = False):
+    """F06 v0: agentic re-evaluation — stable across clicks, explains
+    changes, invalidates stale plans when the world moves (§12, §51).
+    Human approval stays mandatory (F07). ?debate=1 forces the full
+    debate chamber even on clean-cut calls (slower, ~1-2 min)."""
+    try:
+        out = gateway.recommend_for_incident(incident_id, force_debate=debate)
+    except LookupError:
         raise HTTPException(status_code=404, detail="Incident not found")
-    rejected_pairs = {
-        (card.get("proposed_team_id"), card.get("incident_id"))
-        for card in pending_actions.list_for_incident(incident_id)
-        if card.get("state") == "REJECTED" and card.get("proposed_team_id")
-    }
-    rec = gateway.recommend_team(item, teams.list_teams(), rejected_pairs=rejected_pairs)
-    pending = None
-    if rec.get("team_id"):
-        existing = [
-            card for card in pending_actions.list_for_incident(incident_id)
-            if card.get("state") == "PENDING" and card.get("proposed_team_id") == rec.get("team_id")
-        ]
-        pending = existing[0] if existing else pending_actions.create_action(
-            type_="ASSIGN",
-            incident_id=incident_id,
-            proposed_team_id=rec.get("team_id"),
-            reasons=rec.get("reasons") or [],
-            payload={"recommendation": rec},
-        )
+    rec, pending = out["recommendation"], out["pending_action"]
     activity.log_event(
         actor="agent",
         type_="allocation_recommended",
         summary=(
             f"AllocationAgent recommends {rec.get('team_name') or 'no team'} "
-            f"for {incident_id}"
+            f"for {incident_id} [{out['stability']['verdict']}]"
         ),
-        payload={"incident_id": incident_id, "recommendation": rec},
+        payload={"incident_id": incident_id, "recommendation": rec,
+                 "stability": out["stability"]},
+        run_id=(pending or {}).get("run_id") or "",
     )
-    return {"recommendation": rec, "pending_action": pending}
+    realtime.publish("AGENT_RECOMMENDATION_CREATED",
+                     {"incident_id": incident_id, "recommendation": rec,
+                      "pending_action": pending, "stability": out["stability"]})
+    return {"recommendation": rec, "pending_action": pending,
+            "stability": out["stability"], "debate": out.get("debate")}
 
 
 @router.get("/pending-actions")
@@ -381,20 +497,69 @@ def decide_pending_action(
     body: ApprovalDecision,
     user: CurrentUser = Depends(require_role("coordinator")),
 ):
+    return _apply_decision(pending_id, body.decision, body.override_team_id,
+                           user.id, note=body.note, via="console")
+
+
+def _run_clock_min(run_id: str) -> float | None:
+    """Sim-clock of a run for response-time stamps. None outside runs."""
+    if not run_id:
+        return None
+    try:
+        from app.db.repos import simulation_runs as _runs
+
+        run = _runs.get_run(run_id)
+        return float(run.get("clock_min") or 0) if run else None
+    except Exception:
+        return None
+
+
+def _apply_decision(pending_id: str, decision: str, override_team_id: str | None,
+                    actor_id: str, note: str = "", via: str = "console") -> dict:
+    """Shared approve/reject executor: console buttons and explicit chat
+    commands run the identical path (same gate, audit, idempotency)."""
     card = pending_actions.get_action(pending_id)
     if card is None:
         raise HTTPException(status_code=404, detail="Pending action not found")
-    decided = pending_actions.decide(pending_id, body.decision, user.id, note=body.note)
-    if body.decision == "REJECTED":
+    decision = decision.upper()
+    if decision not in ("APPROVED", "REJECTED"):
+        raise HTTPException(status_code=422, detail="decision must be APPROVED or REJECTED")
+    card_run_id = card.get("run_id") or ""
+    if via == "autonomous_test":
+        # Phase C: autonomous approval only inside AUTONOMOUS_TEST runs.
+        # Anything else must come through the human console path.
+        from app.db.repos import simulation_runs as _runs
+
+        _run = _runs.get_run(card_run_id) if card_run_id else None
+        if _run is None or _run.get("mode") != "AUTONOMOUS_TEST":
+            raise HTTPException(status_code=403, detail="autonomous approval not allowed here")
+    was_pending = card.get("state") == "PENDING"
+    decided = pending_actions.decide(pending_id, decision, actor_id, note=note)
+    if decision == "REJECTED":
+        # Release the soft hold so the team is recommendable again.
+        try:
+            held_id = card.get("proposed_team_id")
+            held = teams.get_team(held_id) if held_id else None
+            if held and held.get("status") == "SOFT_RESERVED":
+                teams.update_team(held_id, status="AVAILABLE")
+        except Exception:
+            pass
         activity.log_event(
             actor="human",
             type_="pending_action_rejected",
             summary=f"Coordinator rejected {pending_id}",
-            payload={"pending_id": pending_id, "incident_id": card.get("incident_id"), "note": body.note},
+            payload={"pending_id": pending_id, "incident_id": card.get("incident_id"), "note": note},
+            run_id=card_run_id,
         )
-        return {"pending_action": decided, "executed": False}
+        realtime.publish("HUMAN_REJECTION", {"pending_id": pending_id,
+                                             "incident_id": card.get("incident_id")})
+        return {"pending_action": decided, "executed": False, "via": via}
 
-    team_id = body.override_team_id or card.get("proposed_team_id")
+    if not was_pending:
+        # Idempotent replay: already decided, never double-execute.
+        return {"pending_action": decided, "executed": False, "deduped": True, "via": via}
+
+    team_id = override_team_id or card.get("proposed_team_id")
     if not team_id:
         raise HTTPException(status_code=409, detail="Approved action has no team to dispatch")
     team = teams.get_team(team_id)
@@ -404,14 +569,35 @@ def decide_pending_action(
     if incident is None:
         raise HTTPException(status_code=404, detail="Incident not found")
 
-    mission = missions.create_for_assignment(card["incident_id"], team_id, pending_action_id=pending_id)
-    incidents.update_incident(
-        card["incident_id"],
-        assigned_team=team_id,
-        mission_id=mission["id"],
-        status="ASSIGNED",
-    )
-    teams.update_team(team_id, status="ON_MISSION", current_mission_id=mission["id"])
+    sim_min = _run_clock_min(card_run_id)
+    mission = missions.create_for_assignment(
+        card["incident_id"], team_id, pending_action_id=pending_id,
+        route_id=(card.get("payload") or {}).get("recommendation", {}).get("route_id"),
+        run_id=card_run_id, sim_min=sim_min)
+    update_fields = {"assigned_team": team_id, "mission_id": mission["id"],
+                     "status": "ASSIGNED"}
+    if sim_min is not None:
+        update_fields["assigned_sim_min"] = D(sim_min)
+    incidents.update_incident(card["incident_id"], **update_fields)
+    teams.update_team(team_id, current_mission_id=mission["id"])
+    from app.services import world_sync as _world_sync
+
+    _world_sync.apply_team_status(team_id, "ON_MISSION", source="COORDINATOR")
+    # Phase 8 communication simulation (§50): attempt contact, best-effort.
+    try:
+        from app.services import comms as _comms
+
+        contact = _comms.contact_team(teams.get_team(team_id) or {"id": team_id},
+                                       f"Dispatched to {card['incident_id']}")
+        activity.log_event(
+            actor="agent", type_="team_contacted" if contact.get("delivered") else "communication_lost",
+            summary=f"Contact {team.get('name', team_id)}: {contact.get('detail')}",
+            payload={"team_id": team_id, "mission_id": mission["id"]},
+            run_id=card_run_id)
+        if contact.get("timeout"):
+            realtime.publish("COMMUNICATION_LOST", {"target": {"type": "TEAM", "id": team_id}})
+    except Exception:
+        pass
     activity.log_event(
         actor="human",
         type_="pending_action_approved",
@@ -422,82 +608,73 @@ def decide_pending_action(
             "team_id": team_id,
             "mission_id": mission["id"],
         },
+        run_id=card_run_id,
     )
-    broadcast.fire_and_forget("dispatch", {"mission": mission, "incident_id": card["incident_id"]})
-    return {"pending_action": decided, "mission": mission, "executed": True}
+    realtime.publish("MISSION_CREATED", {"mission": mission, "incident_id": card["incident_id"]})
+    realtime.publish("HUMAN_APPROVAL", {"pending_id": pending_id,
+                                        "incident_id": card["incident_id"],
+                                        "mission_id": mission["id"]})
+    realtime.publish("INCIDENT_UPDATED", {"incident": incidents.get_incident(card["incident_id"])})
+    return {"pending_action": decided, "mission": mission, "executed": True, "via": via}
+
+
+def _manual_assign(incident_id: str, team_id: str, via: str = "console") -> dict:
+    """Shared manual-override executor for console + explicit chat commands.
+
+    Same invariants as the approval gate: the team must be dispatchable,
+    and the assignment mints a real mission row (never a bare FK).
+    """
+    team = teams.get_team(team_id)
+    if team is None:
+        raise HTTPException(status_code=404, detail="Team not found")
+    if team.get("status") not in ("AVAILABLE", "RETURNING"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Team {team.get('name', team_id)} is {team.get('status')} — not dispatchable")
+    item = incidents.update_incident(
+        incident_id, assigned_team=team_id, status="ASSIGNED"
+    )
+    if item is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    mission = missions.create_for_assignment(
+        incident_id, team_id, run_id=item.get("run_id") or "")
+    incidents.update_incident(incident_id, mission_id=mission["id"])
+    item = incidents.get_incident(incident_id)
+    teams.update_team(team_id, current_mission_id=mission["id"])
+    from app.services import world_sync as _world_sync2
+
+    _world_sync2.apply_team_status(team_id, "ON_MISSION", source="COORDINATOR")
+    activity.log_event(
+        actor="human",
+        type_="team_assigned",
+        summary=f"{team.get('name', team_id)} assigned to {incident_id} (manual via {via})",
+        payload={"incident_id": incident_id, "team_id": team_id, "via": via},
+    )
+    realtime.publish("MISSION_UPDATED", {"incident_id": incident_id, "team_id": team_id})
+    realtime.publish("INCIDENT_UPDATED", {"incident": item})
+    return item
 
 
 @router.post("/incidents/{incident_id}/assign")
 def assign(incident_id: str, body: AssignRequest):
     """Manual override (F07): coordinator assigns a team directly. In S4 the
     AllocationAgent writes a recommendation and this becomes approve/reject."""
-    team = teams.get_team(body.team_id)
-    if team is None:
-        raise HTTPException(status_code=404, detail="Team not found")
-    item = incidents.update_incident(
-        incident_id, assigned_team=body.team_id, status="ASSIGNED"
-    )
-    if item is None:
-        raise HTTPException(status_code=404, detail="Incident not found")
-    teams.update_team(
-        body.team_id, status="ON_MISSION", current_mission_id=incident_id
-    )
-    activity.log_event(
-        actor="human",
-        type_="team_assigned",
-        summary=f"{team.get('name', body.team_id)} assigned to {incident_id} (manual)",
-        payload={"incident_id": incident_id, "team_id": body.team_id},
-    )
-    return item
+    return _manual_assign(incident_id, body.team_id)
 
 
 @router.post("/sensor-events")
 def create_sensor_event(body: SensorEventCreate):
-    """Manual/simulation signal. Simulation data is treated as local truth.
-
-    Public API data can still be shown later, but if it conflicts with a
-    fresh SIMULATION signal, the map/risk layer should prefer simulation.
+    """Manual/simulation signal. Routed through world_sync: the observation
+    is stamped with provenance, closures notify the coordinator, and the
+    map/risk layer prefers SIMULATION over PUBLIC_API on conflict.
     """
-    key = body.idempotency_key or f"manual_{uuid.uuid4().hex[:12]}"
-    payload = {
-        "kind": body.kind,
-        "lat": D(body.lat),
-        "lng": D(body.lng),
-        "value": D(body.value) if body.value is not None else None,
-        "level": body.level,
-        "note": body.note,
-        "source_priority": body.source_priority,
-    }
-    event = simulation_events.put_event(key, body.kind, payload)
-    broadcast.fire_and_forget("sensor_event", {"event": event})
+    from app.services import world_sync
 
-    geohash = users.geohash_encode(float(body.lat), float(body.lng)) if hasattr(users, "geohash_encode") else None
-    if geohash is None:
-        from app.utils.geo import geohash_encode
-
-        geohash = geohash_encode(float(body.lat), float(body.lng))
-    risk_level = "HOTSPOT" if body.level in {"HOTSPOT", "UNSAFE"} else body.level
-    areas.put_area_risk({
-        "geohash": geohash,
-        "level": risk_level,
-        "center": {"lat": D(body.lat), "lng": D(body.lng)},
-        "radius_m": 1800,
-        "request_count": 0,
-        "high_urgency_count": 0,
-        "source": body.source_priority,
-        "source_priority": body.source_priority,
-        "sensor_kind": body.kind,
-        "sensor_value": D(body.value) if body.value is not None else None,
-        "note": body.note,
-        "updated_at": int(time.time() * 1000),
-    })
-    activity.log_event(
-        actor="agent" if body.source_priority == "SIMULATION" else "system",
-        type_="sensor_event_received",
-        summary=f"{body.source_priority} {body.kind}: {body.level} near {body.lat:.4f},{body.lng:.4f}",
-        payload={"idempotency_key": key, "event": payload},
-    )
-    return {"event": event}
+    return world_sync.apply_sensor(
+        kind=body.kind, lat=float(body.lat), lng=float(body.lng),
+        value=None if body.value is None else float(body.value),
+        level=body.level, note=body.note or "",
+        source=body.source_priority, idempotency_key=body.idempotency_key)
 
 
 @router.post("/risk/recompute-density")
@@ -549,9 +726,14 @@ def recompute_density_risk():
 
 @router.patch("/shelters/{shelter_id}/occupancy")
 def update_shelter_occupancy(shelter_id: str, body: ShelterOccupancyUpdate):
-    if shelters.get_shelter(shelter_id) is None:
+    from app.services import world_sync
+
+    try:
+        out = world_sync.apply_shelter_occupancy(
+            shelter_id, body.current_occupancy, source=body.source)
+    except LookupError:
         raise HTTPException(status_code=404, detail="Shelter not found")
-    item = shelters.update_occupancy(shelter_id, body.current_occupancy)
+    item = out["shelter"]
     activity.log_event(
         actor="agent" if body.source == "SIMULATION" else "human",
         type_="shelter_occupancy_updated",
@@ -617,7 +799,7 @@ def get_agents_status():
                 "role": "Master Orchestrator & Approval Gatekeeper",
                 "type": "LLM_AND_STATE_MACHINE",
                 "status": "HEALTHY",
-                "model": "groq/llama-3.3-70b-versatile" if groq_configured else "degraded-fallback",
+                "model": settings.groq_model if groq_configured else "degraded-fallback",
                 "state_machine": "PENDING -> APPROVED | REJECTED | SUPERSEDED",
                 "pending_count": len(pending),
                 "active_incidents": len(open_incidents),
@@ -630,7 +812,7 @@ def get_agents_status():
                 "role": "Multilingual Distress Signal NLP Extraction",
                 "type": "LLM_WITH_REGEX_FALLBACK",
                 "status": "HEALTHY" if groq_configured else "DEGRADED_MODE",
-                "model": "groq/llama-3.3-70b-versatile" if groq_configured else "regex-multilingual-v2",
+                "model": settings.groq_model if groq_configured else "regex-multilingual-v2",
                 "languages": ["English", "Hindi", "Nepali", "Hinglish"],
                 "extraction_fields": ["people", "vulnerabilities", "urgency", "water_rising", "location_text"],
                 "tools": ["normalize_extraction", "geocode_location", "regex_extractor"],
@@ -642,7 +824,7 @@ def get_agents_status():
                 "role": "Conversational Citizen Helpline & Live Memory Sync",
                 "type": "LLM_CONVERSATIONAL",
                 "status": "HEALTHY" if groq_configured else "DEGRADED_MODE",
-                "model": "groq/llama-3.3-70b-versatile" if groq_configured else "rule-template-engine",
+                "model": settings.groq_model if groq_configured else "rule-template-engine",
                 "memory_sync": "Auto-updates DynamoDB Users table on turn (F19)",
                 "tools": ["context_builder", "update_user_info", "shelter_lookup"],
                 "last_active": "Live chat channel",
@@ -739,26 +921,9 @@ def get_digital_twin():
     }
 
 
-@router.get("/benchmark/challenges")
-def get_benchmark_challenges():
-    """List the 5 standardized ResQra-Bench disaster challenges."""
-    from app.services.resqra_bench import BENCHMARK_CHALLENGES
-    return {"challenges": BENCHMARK_CHALLENGES}
-
-
-@router.post("/benchmark/run")
-def run_benchmark_suite(body: dict | None = None):
-    """Run full ResQra-Bench or a single benchmark challenge."""
-    from app.services.resqra_bench import run_full_benchmark_suite, run_single_benchmark
-    challenge_id = (body or {}).get("challenge_id")
-    if challenge_id:
-        return run_single_benchmark(challenge_id)
-    return run_full_benchmark_suite()
-
-
 @router.post("/agentic/reason")
 def agentic_reason(body: dict):
-    """Execute dynamic multi-step ReAct reasoning trajectory."""
+    """Temporary Supervisor/Route shim ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â Phase 6-8 replaces with POST /agents/*."""
     from app.services.react_agent import react_agent
     return react_agent.reason_and_act(body)
 
@@ -776,7 +941,7 @@ def demo_reset():
         reset_and_seed_rautahat()
         
         try:
-            broadcast.fire_and_forget("scenario_reset", {"status": "SUCCESS", "timestamp": time.time()})
+            realtime.publish("SCENARIO_RESET", {"status": "SUCCESS", "timestamp": time.time()})
         except Exception:
             pass
             
@@ -785,165 +950,4 @@ def demo_reset():
         import logging
         logging.getLogger(__name__).exception("Demo reset failed: %s", e)
         raise HTTPException(status_code=500, detail=f"Reset failed: {str(e)}")
-
-
-
-@router.post("/demo/simulate-custom")
-def simulate_custom_disaster(body: dict):
-    """Executes dynamic multi-agent simulation with custom disaster parameters,
-    dragged fleet GPS coordinates, and injected road/bridge obstacles."""
-    import math
-
-    sos_count = int(body.get("sos_count", 6))
-    victim_count = int(body.get("victim_count", 24))
-    sector = body.get("sector", "gaur")
-    custom_teams = body.get("teams", [])
-    blocked_obstacles = body.get("blocked_obstacles", [])
-
-    sector_centers = {
-        "gaur": {"lat": 26.7640, "lng": 85.2780, "name": "Gaur Municipality Urban Basin"},
-        "tikuliya": {"lat": 26.7820, "lng": 85.2420, "name": "Tikuliya Ghat Lalbakaiya Basin"},
-        "garuda": {"lat": 26.9250, "lng": 85.3120, "name": "Garuda Municipal Central Plain"},
-        "chandrapur": {"lat": 27.1250, "lng": 85.3400, "name": "Chandranigahapur Highway Base"},
-    }
-    sec_info = sector_centers.get(sector, sector_centers["gaur"])
-
-    has_bridge_collapse = any("bridge" in str(b).lower() or "hospital" in str(b).lower() for b in blocked_obstacles)
-    has_sluice_breach = any("sluice" in str(b).lower() or "ring_road" in str(b).lower() for b in blocked_obstacles)
-
-    start_t = time.perf_counter()
-    steps = []
-
-    # Step 1: Supervisor & Hydrology
-    step1_thought = f"Supervisor initializing disaster response for {sec_info['name']}. Ingesting {sos_count} active SOS calls representing {victim_count} citizens in peril. Checking Bagmati/Lalbakaiya telemetry."
-    step1_obs = {
-        "sector": sec_info["name"],
-        "active_sos": sos_count,
-        "total_victims": victim_count,
-        "bagmati_level_m": 6.80,
-        "surge_above_danger_m": 2.30,
-        "flood_defcon": 1,
-    }
-    steps.append({
-        "agent": "Supervisor & Hydrology Agent",
-        "thought": step1_thought,
-        "tool_call": {"tool": "check_hydrology_gauges", "args": {"sector": sector}},
-        "observation": step1_obs,
-    })
-
-    # Step 2: Obstacle Inundation & Passability Check
-    step2_thought = "Evaluating route passability between incident cluster and nearest critical facilities."
-    step2_obs = {
-        "injected_obstacles_active": len(blocked_obstacles),
-        "blocked_corridors": blocked_obstacles,
-        "gaur_hospital_bridge_status": "COLLAPSED_1.85M_WATER" if has_bridge_collapse else "PASSABLE",
-        "ring_road_sluice_status": "SUBMERGED_2.1M_WATER" if has_sluice_breach else "PASSABLE",
-    }
-    steps.append({
-        "agent": "ReAct Obstacle & Digital Twin Scout",
-        "thought": step2_thought,
-        "tool_call": {"tool": "check_road_passability", "args": {"obstacles": blocked_obstacles}},
-        "observation": step2_obs,
-    })
-
-    # Step 3: Autonomous Self-Correction & Shelter Routing
-    if has_bridge_collapse:
-        step3_thought = "CRITICAL OBSTACLE CONFIRMED: Gaur Hospital Bridge is collapsed. Rerouting evacuation vector to high-ground Rautahat Sports Stadium Camp (Capacity 3000, boat dock available)."
-        target_shelter = {
-            "name": "Rautahat Sports Stadium Camp",
-            "lat": 26.7680,
-            "lng": 85.2810,
-            "elevation_m": 68.0,
-            "free_capacity": 2580,
-        }
-        self_correction = "Autonomous High-Ground Bypass: Diverted convoy away from collapsed bridge to Rautahat Sports Stadium."
-    else:
-        step3_thought = "Direct hospital route available. Target: Gaur District Hospital & Trauma Center."
-        target_shelter = {
-            "name": "Gaur District Hospital & Trauma Center",
-            "lat": 26.7640,
-            "lng": 85.2780,
-            "elevation_m": 65.2,
-            "free_capacity": 18,
-        }
-        self_correction = None
-
-    steps.append({
-        "agent": "ReAct Dynamic Planner",
-        "thought": step3_thought,
-        "tool_call": {"tool": "inspect_shelter_capacity", "args": {"target": target_shelter["name"]}},
-        "observation": target_shelter,
-        "self_correction": self_correction,
-    })
-
-    # Step 4: Fleet Distance & Convoy Allocation from Dragged GPS
-    default_fleet = [
-        {"id": "team_gaur_bagmati", "name": "GAUR BAGMATI WATER RESCUE UNIT", "lat": 26.7610, "lng": 85.2750, "capacity": 16, "vessel": "Heavy Motorboat"},
-        {"id": "team_apf_rautahat", "name": "APF NO. 11 BATTALION RAUTAHAT", "lat": 26.7680, "lng": 85.2820, "capacity": 22, "vessel": "Amphibious Troop Raft"},
-        {"id": "team_nepal_army_gaur", "name": "NEPAL ARMY GAUR CONTINGENT", "lat": 26.7570, "lng": 85.2710, "capacity": 18, "vessel": "Assault Boat Squadron"},
-        {"id": "team_redcross_rautahat", "name": "NEPAL RED CROSS RAUTAHAT", "lat": 26.7645, "lng": 85.2775, "capacity": 12, "vessel": "Medical Zodiac Raft"},
-        {"id": "team_lalbakaiya_patrol", "name": "LALBAKAIYA TIKULIYA SQUAD", "lat": 26.7840, "lng": 85.2410, "capacity": 10, "vessel": "Light Motor Raft"},
-        {"id": "team_chandrapur_sdrf", "name": "CHANDRAPUR HIGHWAY DISASTER WING", "lat": 27.1250, "lng": 85.3400, "capacity": 14, "vessel": "Heavy 4x4 & Raft Unit"},
-    ]
-
-    fleet_pool = custom_teams if custom_teams else default_fleet
-
-    def haversine(lat1, lon1, lat2, lon2):
-        R = 6371.0
-        dlat = math.radians(lat2 - lat1)
-        dlon = math.radians(lon2 - lon1)
-        a = math.sin(dlat / 2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2)**2
-        return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-
-    for t in fleet_pool:
-        dist = haversine(float(t.get("lat", 26.76)), float(t.get("lng", 85.27)), sec_info["lat"], sec_info["lng"])
-        t["distance_km"] = round(dist, 2)
-        t["eta_minutes"] = round(dist / 0.35, 1)
-
-    sorted_fleet = sorted(fleet_pool, key=lambda x: x["distance_km"])
-    assigned_convoy = []
-    accum_cap = 0
-
-    for u in sorted_fleet:
-        assigned_convoy.append(u)
-        accum_cap += int(u.get("capacity", 12))
-        if accum_cap >= victim_count:
-            break
-
-    step4_thought = f"Calculating optimal dispatch for {victim_count} citizens using live GPS telemetry of {len(fleet_pool)} candidate vessels. Dispatched {len(assigned_convoy)} squadrons to fulfill {accum_cap} rescue capacity."
-    steps.append({
-        "agent": "Allocation Engine & Fleet Tactician",
-        "thought": step4_thought,
-        "tool_call": {"tool": "solve_multivessel_dispatch", "args": {"victims": victim_count, "convoy_size": len(assigned_convoy)}},
-        "observation": {
-            "dispatched_squadrons": [u["name"] for u in assigned_convoy],
-            "total_convoy_capacity": accum_cap,
-            "capacity_surplus": accum_cap - victim_count,
-            "fastest_eta_minutes": assigned_convoy[0]["eta_minutes"] if assigned_convoy else 3.2,
-        },
-    })
-
-    # Step 5: Communication Officer Broadcast
-    advisory_text = f"अत्यन्त जरुरी सूचना: {sec_info['name']} क्षेत्रमा बाढी बढेकोले {len(assigned_convoy)} वटा उद्धार डुङ्गाहरू परिचालन गरिएको छ। सम्पूर्ण नागरिकहरू उच्च स्थानमा रहनुहोला।"
-    steps.append({
-        "agent": "Communication Officer",
-        "thought": "Synthesizing urgent multi-lingual emergency broadcast in Nepali and Maithili for local population.",
-        "tool_call": {"tool": "generate_multilingual_broadcast", "args": {"languages": ["Nepali", "Maithili", "English"]}},
-        "observation": {"broadcast_text": advisory_text, "status": "BROADCAST_TRANSMITTED"},
-    })
-
-    elapsed_ms = round((time.perf_counter() - start_t) * 1000, 2)
-
-    return {
-        "status": "SIMULATION_SUCCESS",
-        "execution_latency_ms": elapsed_ms,
-        "sector": sec_info,
-        "sos_count": sos_count,
-        "victim_count": victim_count,
-        "target_shelter": target_shelter,
-        "dispatched_convoy": assigned_convoy,
-        "thinking_stream": steps,
-        "tactical_orders": f"Deploying {len(assigned_convoy)} vessels ({assigned_convoy[0]['name']} leading) to {sec_info['name']}. Evacuating {victim_count} victims to {target_shelter['name']}.",
-    }
-
 

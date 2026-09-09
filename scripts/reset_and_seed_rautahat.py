@@ -28,12 +28,15 @@ def D(x: float) -> Decimal:
 # 1. RAUTAHAT RESCUE FLEET (LED BY GAUR BAGMATI WATER RESCUE UNIT)
 # ===========================================================================
 RAUTAHAT_TEAMS = [
-    ("team_gaur_bagmati", "GAUR BAGMATI WATER RESCUE UNIT (Rautahat)", 26.7610, 85.2750, 16, "AVAILABLE", 48, "Lead Heavy Inflatable Motorboat Patrol", "+977-55-520100", "rautahat"),
-    ("team_apf_rautahat", "APF NO. 11 BATTALION RAUTAHAT", 26.7680, 85.2820, 22, "AVAILABLE", 64, "Amphibious Flood Extraction Battalion", "Radio 142.8 MHz", "rautahat"),
-    ("team_nepal_army_gaur", "NEPAL ARMY GAUR DISASTER CONTINGENT", 26.7570, 26.7570 if False else 85.2710, 18, "AVAILABLE", 52, "Assault Inflatable Boat Squad", "Radio 148.6 MHz", "rautahat"),
-    ("team_redcross_rautahat", "NEPAL RED CROSS RAUTAHAT CHAPTER", 26.7645, 85.2775, 12, "AVAILABLE", 34, "Emergency Medical Zodiac Raft", "+977-55-520250", "rautahat"),
-    ("team_lalbakaiya_patrol", "LALBAKAIYA TIKULIYA FLOOD UNIT", 26.7840, 85.2410, 10, "AVAILABLE", 26, "Riverbank Rapid Extraction Raft", "Radio 146.2 MHz", "rautahat"),
-    ("team_chandrapur_sdrf", "CHANDRAPUR HIGHWAY DISASTER WING", 27.1250, 85.3400, 14, "AVAILABLE", 38, "Heavy 4x4 & Raft Transport Unit", "+977-55-540111", "rautahat"),
+    # id, name, lat, lng, capacity, status, rescued_total, specialization, contact, district, station notes
+    # Stations verified against district record: Gaur HQ 26.7667N 85.2667E; APF Bn No.11 east of Gaur with BOP at
+    # Gaur Customs; NRCS chapter +977-55-520141; District Police 055-520840; Provincial Hospital 055-520142.
+    ("team_gaur_bagmati", "GAUR BAGMATI WATER RESCUE UNIT", 26.7660, 85.2740, 16, "AVAILABLE", 48, "Swift-water rescue, inflatable motorboat patrol", "Radio 144.2 MHz", "rautahat", "Ward 4 boat station, Bagmati eastern embankment breach corridor"),
+    ("team_apf_rautahat", "APF BATTALION NO. 11, RAUTAHAT", 26.7670, 85.2920, 22, "AVAILABLE", 64, "Amphibious flood extraction battalion", "Radio 142.8 MHz", "rautahat", "Battalion HQ east of Gaur; BOP at Gaur Customs, Bairgania road"),
+    ("team_nepal_army_gaur", "NEPAL ARMY GAUR CONTINGENT", 26.7620, 85.2580, 18, "AVAILABLE", 52, "Assault boat squad, deep-water extraction", "Radio 148.6 MHz", "rautahat", "Barracks west Gaur, Ring Road rapid deployment"),
+    ("team_redcross_rautahat", "NEPAL RED CROSS RAUTAHAT CHAPTER", 26.7645, 85.2700, 12, "AVAILABLE", 34, "Emergency medical triage, zodiac raft", "+977-55-520141", "rautahat", "District chapter HQ Gaur; referral Provincial Hospital 055-520142"),
+    ("team_lalbakaiya_patrol", "LALBAKAIYA TIKULIYA FLOOD UNIT", 26.7840, 85.2410, 10, "AVAILABLE", 26, "Riverbank rapid extraction raft", "Radio 146.2 MHz", "rautahat", "Tikuliya Ghat post; coord District Police 055-520840"),
+    ("team_chandrapur_sdrf", "CHANDRAPUR HIGHWAY DISASTER WING", 27.1250, 85.3400, 14, "AVAILABLE", 38, "Highway evacuation, 4x4 and raft transport", "Radio 147.5 MHz", "rautahat", "East-West Highway base, Chandranigahapur"),
 ]
 
 # ===========================================================================
@@ -108,6 +111,19 @@ RAUTAHAT_INCIDENTS = [
 ]
 
 
+# ===========================================================================
+# 3. SEEDED RESIDENTS (VISIBLE BEACONS ON THE COORDINATOR MAP)
+# ===========================================================================
+RAUTAHAT_RESIDENTS = [
+    ("+9779800001001", "Ram Kishor Yadav", 26.7660, 85.2770, "Gaur Ward 4, near breached embankment", 7, ["pregnant", "children"], "TRAPPED"),
+    ("+9779800001002", "Sunita Devi", 26.7590, 85.2720, "Juddha School relief camp", 2, ["elderly"], "NEEDS_HELP"),
+    ("+9779800001003", "Mohammad Salim", 26.7820, 85.2420, "Tikuliya Ghat riverbank", 4, [], "TRAPPED"),
+    ("+9779800001004", "Gita Sharma", 26.7640, 85.2780, "Gaur Hospital Chowk", 5, ["ill", "elderly"], "NEEDS_HELP"),
+    ("+9779800001005", "Hari Prasad Sah", 26.9250, 85.3120, "Garuda Bazaar upper floor", 4, [], "SAFE"),
+    ("+9779800001006", "Mina Kumari", 27.1240, 85.3380, "Chandrapur Highway tea stall", 2, ["children"], "SAFE"),
+]
+
+
 def reset_and_seed_rautahat():
     print("=" * 60)
     print("ResQra Rautahat District Terai Flood OS Reset & Seed")
@@ -147,7 +163,7 @@ def reset_and_seed_rautahat():
 
     # 3. Seed Rautahat Rescue Fleet
     now_ms = int(time.time() * 1000)
-    for tid, name, lat, lng, cap, st, res_cnt, spec, contact, district in RAUTAHAT_TEAMS:
+    for tid, name, lat, lng, cap, st, res_cnt, spec, contact, district, notes in RAUTAHAT_TEAMS:
         teams.put_team({
             "id": tid,
             "name": name,
@@ -157,6 +173,7 @@ def reset_and_seed_rautahat():
             "specialization": spec,
             "contact": contact,
             "district": district,
+            "notes": notes,
             "location": {"lat": D(lat), "lng": D(lng), "label": f"{name} Station", "updated_at": now_ms},
         })
     print(f"  [OK] Seeded {len(RAUTAHAT_TEAMS)} Rautahat Rescue Squadrons (Lead: GAUR BAGMATI WATER RESCUE UNIT)")
@@ -205,9 +222,39 @@ def reset_and_seed_rautahat():
         source="Rautahat District Emergency Operations Center (DEOC Gaur)",
     )
     print("  [OK] Seeded Official Rautahat District Emergency Bulletin")
+
+    # 8. Seed Resident Beacons (idempotent by phone)
+    resident_count = 0
+    for phone, name, lat, lng, label, people, vulns, status in RAUTAHAT_RESIDENTS:
+        existing = users.find_by_phone(phone)
+        if existing:
+            user_id = existing["id"]
+        else:
+            user_id = users.create_user(phone=phone, name=name, role="resident")["id"]
+        users.update_user_info(
+            user_id,
+            location={"lat": D(lat), "lng": D(lng), "label": label, "confidence": D(0.9)},
+            location_text=label,
+            people_with=people,
+            vulnerabilities=vulns,
+            status=status,
+            device_location={"lat": D(lat), "lng": D(lng), "label": label},
+        )
+        resident_count += 1
+    print(f"  [OK] Seeded {resident_count} Resident Beacons in Rautahat")
     print("=" * 60)
     print("Rautahat District Flood OS Ready! 100% Focused.")
     print("=" * 60)
 
 if __name__ == "__main__":
+    import sys as _sys
+
+    from app.config import settings as _settings
+
+    _endpoint = str(_settings.dynamodb_endpoint_url or "")
+    _local = "localhost" in _endpoint or "127.0.0.1" in _endpoint
+    if not _local and "--confirm-live" not in _sys.argv:
+        print("REFUSING to wipe non-local DynamoDB. Re-run with --confirm-live "
+              "if you really mean to reset live tables.")
+        _sys.exit(2)
     reset_and_seed_rautahat()

@@ -427,5 +427,16 @@ def reset_and_seed():
     print("Multi-District Database Ready! All 3 Corridors Live.")
     print("=" * 60)
 
+
 if __name__ == "__main__":
+    import sys as _sys
+
+    from app.config import settings as _settings
+
+    _endpoint = str(_settings.dynamodb_endpoint_url or "")
+    _local = "localhost" in _endpoint or "127.0.0.1" in _endpoint
+    if not _local and "--confirm-live" not in _sys.argv:
+        print("REFUSING to wipe non-local DynamoDB. Re-run with --confirm-live "
+              "if you really mean to reset live tables.")
+        _sys.exit(2)
     reset_and_seed()

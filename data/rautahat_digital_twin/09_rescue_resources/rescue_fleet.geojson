@@ -1,24 +1,24 @@
 {
   "type": "FeatureCollection",
-  "name": "Rautahat_Rescue_Fleet_Stations",
+  "name": "Rautahat_Team_Stations",
   "features": [
     {
       "type": "Feature",
       "properties": {
         "team_id": "team_gaur_bagmati",
-        "name": "GAUR BAGMATI WATER RESCUE UNIT (Rautahat)",
+        "name": "GAUR BAGMATI WATER RESCUE UNIT",
         "lead_unit": true,
-        "vessel_type": "Heavy Inflatable Motorboat (Cap 16)",
+        "vessel_type": "Swift-water motorboat patrol (Cap 16)",
         "crew_size": 8,
         "radio": "144.2 MHz",
-        "contact": "+977-55-520100",
+        "station": "Ward 4 boat station, Bagmati eastern embankment breach corridor",
         "status": "AVAILABLE"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          85.275,
-          26.761
+          85.274,
+          26.766
         ]
       }
     },
@@ -26,18 +26,19 @@
       "type": "Feature",
       "properties": {
         "team_id": "team_apf_rautahat",
-        "name": "APF NO. 11 BATTALION RAUTAHAT",
+        "name": "APF BATTALION NO. 11, RAUTAHAT",
         "lead_unit": false,
-        "vessel_type": "Amphibious Troop Raft (Cap 22)",
+        "vessel_type": "Amphibious flood extraction battalion (Cap 22)",
         "crew_size": 12,
         "radio": "142.8 MHz",
+        "station": "Battalion HQ east of Gaur; BOP at Gaur Customs, Bairgania road",
         "status": "AVAILABLE"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          85.282,
-          26.768
+          85.292,
+          26.767
         ]
       }
     },
@@ -45,18 +46,19 @@
       "type": "Feature",
       "properties": {
         "team_id": "team_nepal_army_gaur",
-        "name": "NEPAL ARMY GAUR DISASTER CONTINGENT",
+        "name": "NEPAL ARMY GAUR CONTINGENT",
         "lead_unit": false,
-        "vessel_type": "Assault Boat Squadron (Cap 18)",
+        "vessel_type": "Assault boat squad, deep-water extraction (Cap 18)",
         "crew_size": 10,
         "radio": "148.6 MHz",
+        "station": "Barracks west Gaur, Ring Road rapid deployment",
         "status": "AVAILABLE"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          85.271,
-          26.757
+          85.258,
+          26.762
         ]
       }
     },
@@ -66,15 +68,16 @@
         "team_id": "team_redcross_rautahat",
         "name": "NEPAL RED CROSS RAUTAHAT CHAPTER",
         "lead_unit": false,
-        "vessel_type": "Medical Zodiac Raft (Cap 12)",
+        "vessel_type": "Emergency medical triage zodiac (Cap 12)",
         "crew_size": 6,
-        "contact": "+977-55-520250",
+        "contact": "+977-55-520141",
+        "station": "District chapter HQ Gaur; referral Provincial Hospital 055-520142",
         "status": "AVAILABLE"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          85.2775,
+          85.27,
           26.7645
         ]
       }
@@ -85,9 +88,10 @@
         "team_id": "team_lalbakaiya_patrol",
         "name": "LALBAKAIYA TIKULIYA FLOOD UNIT",
         "lead_unit": false,
-        "vessel_type": "Light Motor Raft (Cap 10)",
+        "vessel_type": "Riverbank rapid extraction raft (Cap 10)",
         "crew_size": 4,
         "radio": "146.2 MHz",
+        "station": "Tikuliya Ghat post; coord District Police 055-520840",
         "status": "AVAILABLE"
       },
       "geometry": {
@@ -104,9 +108,10 @@
         "team_id": "team_chandrapur_sdrf",
         "name": "CHANDRAPUR HIGHWAY DISASTER WING",
         "lead_unit": false,
-        "vessel_type": "Heavy 4x4 & Raft Unit (Cap 14)",
+        "vessel_type": "Highway evacuation, 4x4 and raft transport (Cap 14)",
         "crew_size": 8,
-        "contact": "+977-55-540111",
+        "radio": "147.5 MHz",
+        "station": "East-West Highway base, Chandranigahapur",
         "status": "AVAILABLE"
       },
       "geometry": {

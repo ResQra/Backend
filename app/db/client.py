@@ -27,10 +27,34 @@ def table(name: str):
 
 
 def to_dynamo_friendly(obj):
-    """Converts any floats in nested dicts/lists to Decimal for safe DynamoDB persistence."""
-    import json
+    """Recursively convert floats to Decimal for safe DynamoDB persistence.
+
+    Preserves Decimal (unlike a naive json round-trip, which would turn
+    Decimals into strings and corrupt coordinate/number fields).
+    """
     from decimal import Decimal
-    if obj is None:
-        return None
-    return json.loads(json.dumps(obj, default=str), parse_float=Decimal)
+    if obj is None or isinstance(obj, (str, bool, int)):
+        return obj
+    if isinstance(obj, Decimal):
+        return obj
+    if isinstance(obj, float):
+        return Decimal(str(obj))
+    if isinstance(obj, dict):
+        return {k: to_dynamo_friendly(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [to_dynamo_friendly(v) for v in obj]
+    return obj
+
+
+def dynamo_to_json(obj):
+    """Recursively converts DynamoDB Decimals to int/float for plain
+    json.dumps (WebSocket paths don't get FastAPI's jsonable_encoder)."""
+    from decimal import Decimal
+    if isinstance(obj, Decimal):
+        return int(obj) if obj == obj.to_integral_value() else float(obj)
+    if isinstance(obj, dict):
+        return {k: dynamo_to_json(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [dynamo_to_json(v) for v in obj]
+    return obj
 
