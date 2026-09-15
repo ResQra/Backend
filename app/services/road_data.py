@@ -68,7 +68,11 @@ def _ensure_feat_index(graph: dict) -> None:
 def _local_graph_path():
     from pathlib import Path
 
+    local = Path(__file__).resolve().parents[1] / "data" / "road_graph.json"
+    if local.is_file():
+        return local
     return Path(__file__).resolve().parents[3] / "geo" / "data" / "road_graph.json"
+
 
 
 def _load_local_graph() -> dict:

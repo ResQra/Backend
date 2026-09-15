@@ -1,0 +1,312 @@
+{
+  "area": "rautahat",
+  "description": "Rautahat District Road & Infrastructure Graph (ResQra Digital Twin)",
+  "roads": [
+    {
+      "id": "osm_hwy35_gaur_pipara",
+      "name": "Gaur-Pipara Highway",
+      "type": "primary",
+      "blocked": false,
+      "coords": [
+        [
+          26.7645,
+          85.27
+        ],
+        [
+          26.768,
+          85.271
+        ],
+        [
+          26.775,
+          85.276
+        ],
+        [
+          26.79,
+          85.29
+        ],
+        [
+          26.802,
+          85.301
+        ],
+        [
+          26.812,
+          85.308
+        ],
+        [
+          26.815,
+          85.31
+        ]
+      ]
+    },
+    {
+      "id": "osm_hwy35_pipara_garuda",
+      "name": "Pipara-Garuda Highway",
+      "type": "primary",
+      "blocked": false,
+      "coords": [
+        [
+          26.815,
+          85.31
+        ],
+        [
+          26.835,
+          85.313
+        ],
+        [
+          26.855,
+          85.316
+        ],
+        [
+          26.872,
+          85.318
+        ],
+        [
+          26.874,
+          85.316
+        ]
+      ]
+    },
+    {
+      "id": "osm_hwy35_garuda_chandrapur",
+      "name": "Garuda-Chandrapur Highway",
+      "type": "primary",
+      "blocked": false,
+      "coords": [
+        [
+          26.872,
+          85.318
+        ],
+        [
+          26.91,
+          85.321
+        ],
+        [
+          26.96,
+          85.326
+        ],
+        [
+          27.02,
+          85.332
+        ],
+        [
+          27.08,
+          85.337
+        ],
+        [
+          27.125,
+          85.34
+        ],
+        [
+          27.126,
+          85.342
+        ]
+      ]
+    },
+    {
+      "id": "osm_mahendra_hwy_chandrapur",
+      "name": "East-West Highway Chandranigahapur",
+      "type": "trunk",
+      "blocked": false,
+      "coords": [
+        [
+          27.125,
+          85.29
+        ],
+        [
+          27.125,
+          85.32
+        ],
+        [
+          27.125,
+          85.34
+        ],
+        [
+          27.125,
+          85.37
+        ],
+        [
+          27.125,
+          85.4
+        ]
+      ]
+    },
+    {
+      "id": "osm_gaur_bairgania_border_road",
+      "name": "Gaur-Bairgania Border Road",
+      "type": "secondary",
+      "blocked": false,
+      "coords": [
+        [
+          26.76,
+          85.272
+        ],
+        [
+          26.762,
+          85.276
+        ],
+        [
+          26.764,
+          85.275
+        ],
+        [
+          26.7645,
+          85.27
+        ],
+        [
+          26.766,
+          85.274
+        ]
+      ]
+    },
+    {
+      "id": "osm_gaur_east_ward4_access",
+      "name": "Gaur Ward 4 Embankment Access",
+      "type": "residential",
+      "blocked": false,
+      "coords": [
+        [
+          26.762,
+          85.276
+        ],
+        [
+          26.764,
+          85.275
+        ],
+        [
+          26.766,
+          85.274
+        ],
+        [
+          26.767,
+          85.285
+        ],
+        [
+          26.767,
+          85.292
+        ]
+      ]
+    },
+    {
+      "id": "osm_gaur_west_ring_road",
+      "name": "Gaur West Ring Road",
+      "type": "secondary",
+      "blocked": false,
+      "coords": [
+        [
+          26.76,
+          85.26
+        ],
+        [
+          26.762,
+          85.258
+        ],
+        [
+          26.7645,
+          85.27
+        ],
+        [
+          26.766,
+          85.274
+        ],
+        [
+          26.768,
+          85.271
+        ],
+        [
+          26.769,
+          85.267
+        ]
+      ]
+    },
+    {
+      "id": "osm_gaur_tikuliya_link",
+      "name": "Gaur-Tikuliya Ghat Road",
+      "type": "secondary",
+      "blocked": false,
+      "coords": [
+        [
+          26.769,
+          85.267
+        ],
+        [
+          26.772,
+          85.26
+        ],
+        [
+          26.778,
+          85.25
+        ],
+        [
+          26.783,
+          85.243
+        ],
+        [
+          26.784,
+          85.241
+        ],
+        [
+          26.786,
+          85.239
+        ]
+      ]
+    },
+    {
+      "id": "osm_tikuliya_garuda_crosslink",
+      "name": "Tikuliya-Garuda Feeder",
+      "type": "tertiary",
+      "blocked": false,
+      "coords": [
+        [
+          26.784,
+          85.241
+        ],
+        [
+          26.81,
+          85.26
+        ],
+        [
+          26.84,
+          85.285
+        ],
+        [
+          26.872,
+          85.318
+        ]
+      ]
+    }
+  ],
+  "bridges": [
+    {
+      "id": "osm_bridge_bagmati_gaur_east",
+      "name": "Bagmati Embankment Crossing Bridge",
+      "type": "bridge",
+      "blocked": false,
+      "coords": [
+        [
+          26.766,
+          85.274
+        ],
+        [
+          26.767,
+          85.285
+        ]
+      ]
+    },
+    {
+      "id": "osm_bridge_lalbakaiya_tikuliya",
+      "name": "Tikuliya Ghat Lalbakaiya Bridge",
+      "type": "bridge",
+      "blocked": false,
+      "coords": [
+        [
+          26.783,
+          85.243
+        ],
+        [
+          26.784,
+          85.241
+        ]
+      ]
+    }
+  ]
+}
