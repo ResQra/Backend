@@ -11,3 +11,4 @@ moto>=5.0
 strands-agents>=1.53
 httpx>=0.27
 networkx>=3.4
+gradio>=4.0
