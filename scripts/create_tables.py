@@ -20,8 +20,19 @@ from app.db.tables import TABLES  # noqa: E402
 
 def main() -> None:
     kwargs = {"region_name": settings.aws_region}
+    has_credentials = bool(
+        settings.aws_access_key_id and settings.aws_secret_access_key
+    )
     if settings.dynamodb_endpoint_url:
         kwargs["endpoint_url"] = settings.dynamodb_endpoint_url
+        if not has_credentials:
+            kwargs["aws_access_key_id"] = "local"
+            kwargs["aws_secret_access_key"] = "local"
+    elif not has_credentials:
+        raise RuntimeError(
+            "DynamoDB is not configured. Start DynamoDB Local and set "
+            "DYNAMODB_ENDPOINT_URL in Backend/.env, or provide AWS credentials."
+        )
     client = boto3.client("dynamodb", **kwargs)
 
     existing = set(client.list_tables().get("TableNames", []))

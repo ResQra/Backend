@@ -96,3 +96,30 @@ async def on_startup():
     import threading
 
     threading.Thread(target=_prewarm, daemon=True).start()
+
+
+# Serve built frontend if available (unified Docker/Hugging Face/Render deployment)
+import pathlib
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+_static_candidates = [
+    pathlib.Path(__file__).resolve().parent.parent / "static",
+    pathlib.Path(__file__).resolve().parents[2] / "frontend" / "dist",
+]
+_static_dir = next((p for p in _static_candidates if p.is_dir()), None)
+
+if _static_dir:
+    _assets_dir = _static_dir / "assets"
+    if _assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(_assets_dir)), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def _serve_frontend(full_path: str):
+        if full_path.startswith("api") or full_path.startswith("ws"):
+            return JSONResponse(status_code=404, content={"detail": "Not found"})
+        target = _static_dir / full_path
+        if full_path and target.is_file():
+            return FileResponse(target)
+        return FileResponse(_static_dir / "index.html")
+

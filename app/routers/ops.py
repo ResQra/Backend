@@ -322,6 +322,21 @@ def list_teams_():
     return {"teams": teams.list_teams()}
 
 
+@router.get("/twin-layers")
+def twin_layers():
+    from app.services import rautahat_digital_twin
+    return {
+        "district": rautahat_digital_twin.get_district_boundary(),
+        "municipalities": rautahat_digital_twin.get_municipalities_geojson(),
+        "rivers": rautahat_digital_twin.get_rivers_geojson(),
+        "embankments": rautahat_digital_twin.get_embankments_geojson(),
+        "flood_2024": rautahat_digital_twin.get_flood_2024_geojson(),
+        "infrastructure": rautahat_digital_twin.get_infrastructure_geojson(),
+        "rescue_fleet": rautahat_digital_twin.get_rescue_fleet_geojson(),
+        "summary": rautahat_digital_twin.get_digital_twin_summary(),
+    }
+
+
 @router.post("/teams")
 def create_team(body: TeamCreate):
     item = {

@@ -11,6 +11,10 @@ from typing import Any
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[3]
 TWIN_ROOT = PROJECT_ROOT / "data" / "rautahat_digital_twin"
+if not TWIN_ROOT.exists():
+    TWIN_ROOT = PROJECT_ROOT / "Backend" / "data" / "rautahat_digital_twin"
+
+
 
 
 def load_geojson(subfolder: str, filename: str) -> dict[str, Any]:

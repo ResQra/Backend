@@ -305,8 +305,13 @@ def _agents_path() -> str:
     env_path = os.environ.get("RESQRA_AGENTS_PATH")
     if env_path:
         return env_path
-    # backend/app/agents_gateway/gateway.py -> repo root -> agents/
-    return str(Path(__file__).resolve().parents[3] / "agents")
+    root = Path(__file__).resolve().parents[3]
+    for candidate in ("agent", "agents"):
+        p = root / candidate
+        if p.is_dir():
+            return str(p)
+    return str(root / "agent")
+
 
 
 def _get_local_agent():

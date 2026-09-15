@@ -84,4 +84,19 @@ def safest_route(body: dict, user: CurrentUser = Depends(get_current_user)):
 
     return {"routes": routes, "best": best, "shelter": shelter,
             "route_explanation": route_reasoning.explain(routes),
-            "disclaimer": "Decision support only Ã¢â‚¬â€ follow official guidance."}
+            "disclaimer": "Decision support only — follow official guidance."}
+
+
+@router.get("/twin-layers")
+def public_twin_layers():
+    from app.services import rautahat_digital_twin
+    return {
+        "district": rautahat_digital_twin.get_district_boundary(),
+        "municipalities": rautahat_digital_twin.get_municipalities_geojson(),
+        "rivers": rautahat_digital_twin.get_rivers_geojson(),
+        "embankments": rautahat_digital_twin.get_embankments_geojson(),
+        "flood_2024": rautahat_digital_twin.get_flood_2024_geojson(),
+        "infrastructure": rautahat_digital_twin.get_infrastructure_geojson(),
+        "rescue_fleet": rautahat_digital_twin.get_rescue_fleet_geojson(),
+        "summary": rautahat_digital_twin.get_digital_twin_summary(),
+    }
